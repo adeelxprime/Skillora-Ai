@@ -17,7 +17,66 @@ export default defineConfig({
             req.on('end', async () => {
               try {
                 const body = JSON.parse(Buffer.concat(chunks).toString());
-                const key = (req.headers['x-gemini-key'] || process.env.VITE_GEMINI_API_KEY || 'AQ.Ab8RN6J0aR8hBkLQkUnrLe0TrNnHUjKo_5Xc9zzBZnitk8qlGg').trim();
+                const provider = body.provider || (req.headers['x-deepseek-key'] ? 'deepseek' : 'gemini');
+
+                // 1. DeepSeek API Provider
+                if (provider === 'deepseek') {
+                  const deepseekKey = (req.headers['x-deepseek-key'] || process.env.VITE_DEEPSEEK_API_KEY || '').trim();
+                  if (!deepseekKey) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'DeepSeek API key (sk-...) is required' }));
+                    return;
+                  }
+
+                  const dsResponse = await fetch('https://api.deepseek.com/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${deepseekKey}`
+                    },
+                    body: JSON.stringify({
+                      model: 'deepseek-chat',
+                      messages: [
+                        {
+                          role: 'system',
+                          content: 'You are an elite AI prompt engineer. Reverse-engineer video and image scenes into ultra-realistic master AI prompts. Return ONLY a valid JSON object matching the schema with keys: subject, camera, lighting, masterPrompt, negative.'
+                        },
+                        {
+                          role: 'user',
+                          content: `Reverse-engineer a master prompt for this scene: ${body.topic || 'high-end cinematic visual'}. Aspect ratio: ${body.aspect || '16:9'}.
+Return JSON:
+{
+  "subject": "Detailed description of subject, action and clothing",
+  "camera": "Camera shot, movement, angle and lens",
+  "lighting": "Volumetric lighting, contrast and atmospheric glow",
+  "masterPrompt": "The complete rich master prompt ready for Kling 1.5 or Runway Gen-3 with 4K 60fps --ar ${body.aspect || '16:9'} --v 6.1 --style raw",
+  "negative": "blurry, low quality, deformed, extra limbs, artifacts, cartoon look"
+}`
+                        }
+                      ]
+                    })
+                  });
+
+                  const dsData = await dsResponse.json();
+                  if (!dsResponse.ok) {
+                    res.writeHead(dsResponse.status, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: dsData.error?.message || 'DeepSeek API error' }));
+                    return;
+                  }
+
+                  let rawText = dsData.choices?.[0]?.message?.content || '';
+                  rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+                  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+                  if (jsonMatch) rawText = jsonMatch[0];
+                  const parsed = JSON.parse(rawText);
+
+                  res.writeHead(200, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify(parsed));
+                  return;
+                }
+
+                // 2. Google Gemini Vision Provider
+                const key = (req.headers['x-gemini-key'] || process.env.VITE_GEMINI_API_KEY || '').trim();
                 const imageData = (body.image || '').replace(/^data:image\/\w+;base64,/, '');
 
                 if (!key || (!key.startsWith('AQ.') && !key.startsWith('AIzaSy'))) {

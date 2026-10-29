@@ -155,20 +155,21 @@ export function PromptStudio() {
   const [copiedVideoPrompt, setCopiedVideoPrompt] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   
-  const DEFAULT_GEMINI_KEY = 'AQ.Ab8RN6J0aR8hBkLQkUnrLe0TrNnHUjKo_5Xc9zzBZnitk8qlGg';
+  // AI Provider & Key Support (Gemini Vision + DeepSeek AI)
+  const [aiProvider, setAiProvider] = useState('gemini'); // 'gemini' | 'deepseek'
+  const [deepseekApiKey, setDeepseekApiKey] = useState(() => {
+    try {
+      return localStorage.getItem('skillora_deepseek_key') || '';
+    } catch (e) {
+      return '';
+    }
+  });
 
-  // Gemini AI Vision Key Support
   const [geminiApiKey, setGeminiApiKey] = useState(() => {
     try {
-      const saved = localStorage.getItem('skillora_gemini_key') || '';
-      // If user has old non-working key saved, upgrade to the active working key
-      if (!saved || saved === 'AQ.Ab8RN6L9Gp6zgj9glLaSf8dKnfaQD2kJvCb_U5TBJovYL3G5ew') {
-        localStorage.setItem('skillora_gemini_key', DEFAULT_GEMINI_KEY);
-        return DEFAULT_GEMINI_KEY;
-      }
-      return saved;
+      return localStorage.getItem('skillora_gemini_key') || '';
     } catch (e) {
-      return DEFAULT_GEMINI_KEY;
+      return '';
     }
   });
   const [frameMetrics, setFrameMetrics] = useState({ r: 128, g: 128, b: 128, brightness: 128 });
@@ -383,8 +384,50 @@ export function PromptStudio() {
     const cleanKey = (geminiApiKey || '').trim();
     const hasValidKey = isValidGeminiKey(cleanKey);
 
-    // 1. If valid Google Gemini Vision API key exists, call Gemini Vision
-    if (hasValidKey) {
+    // 1. DeepSeek AI Provider Branch
+    if (aiProvider === 'deepseek') {
+      setAnalysisStage('2/3: DeepSeek AI reasoning scene prompts...');
+      const cleanDsKey = (deepseekApiKey || '').trim();
+      try {
+        const dsRes = await fetch('/api/extract', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-DeepSeek-Key': cleanDsKey
+          },
+          body: JSON.stringify({
+            provider: 'deepseek',
+            topic: userSceneTopic || selectedTopicChip || uploadedVideoFile?.name || 'cinematic video sequence',
+            aspect: detectedAr,
+            image: frameData
+          })
+        });
+
+        if (dsRes.ok) {
+          const parsed = await dsRes.json();
+          if (parsed.masterPrompt) {
+            setGeneratedVideoPrompt({
+              name: uploadedVideoFile?.name || videoInfo.name || 'Analyzed Video',
+              aspect: detectedAr,
+              subject: parsed.subject || 'Visual Scene',
+              camera: parsed.camera || 'Cinematic Tracking Pan',
+              lighting: parsed.lighting || 'Volumetric Studio Lighting',
+              model: 'DeepSeek AI (V3 / R1)',
+              prompt: parsed.masterPrompt,
+              negative: parsed.negative || 'low quality, blurry, deformed anatomy, artifacts'
+            });
+            setAnalysisProgress(100);
+            setIsAnalyzing(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('DeepSeek call fallback:', e);
+      }
+    }
+
+    // 2. Google Gemini Vision API Provider Branch
+    if (aiProvider === 'gemini' && hasValidKey) {
       setAnalysisStage('2/3: Google Gemini Vision AI extracting scene prompts...');
       try {
         const apiRes = await fetch('/api/extract', {
@@ -538,6 +581,9 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
 
   const handleSaveGeminiKey = () => {
     localStorage.setItem('skillora_gemini_key', geminiApiKey.trim());
+    if (deepseekApiKey) {
+      localStorage.setItem('skillora_deepseek_key', deepseekApiKey.trim());
+    }
     setApiSaveToast(true);
     setTimeout(() => setApiSaveToast(false), 3000);
   };
@@ -847,21 +893,35 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
                   </div>
                 )}
 
-                {/* Gemini Vision Key Option */}
-                <div className="mt-4 pt-3 border-t border-slate-800">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold">
-                      {isValidGeminiKey(geminiApiKey) ? (
-                        <>
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                          <span className="text-emerald-400">Gemini Vision AI: Connected (AIzaSy...)</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                          <span className="text-slate-300">Skillora Frame Analyzer: Active</span>
-                        </>
-                      )}
+                {/* AI Provider Switcher (Gemini Vision vs DeepSeek AI) */}
+                <div className="mt-4 pt-3 border-t border-slate-800 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-300">AI Engine:</span>
+                      <div className="flex rounded-lg bg-slate-900/80 p-0.5 border border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setAiProvider('gemini')}
+                          className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                            aiProvider === 'gemini'
+                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <span>✨ Google Gemini Vision</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAiProvider('deepseek')}
+                          className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                            aiProvider === 'deepseek'
+                              ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <span>🐳 DeepSeek AI</span>
+                        </button>
+                      </div>
                     </div>
 
                     <button
@@ -870,52 +930,100 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
                       className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 transition cursor-pointer"
                     >
                       <Key className="w-3.5 h-3.5" />
-                      <span>{showApiKeyInput ? 'Hide Key' : isValidGeminiKey(geminiApiKey) ? 'Manage Key' : '+ Connect Google Gemini Key'}</span>
+                      <span>{showApiKeyInput ? 'Hide Keys' : 'Manage API Keys'}</span>
                     </button>
                   </div>
 
-                  {showApiKeyInput && (
-                    <div className="mt-2.5 p-3.5 rounded-xl bg-[#040814] border border-cyan-500/30 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[11px] font-bold text-slate-300">
-                          Google Gemini API Key (starts with <code className="text-cyan-300">AIzaSy...</code>):
-                        </p>
-                        <a
-                          href="https://aistudio.google.com/apikey"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[10px] text-cyan-400 hover:underline flex items-center gap-1"
-                        >
-                          Google AI Studio Keys (Tab 2) ↗
-                        </a>
-                      </div>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold">
+                    {aiProvider === 'gemini' ? (
+                      isValidGeminiKey(geminiApiKey) ? (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          <span className="text-emerald-400">Gemini 3.5 Vision AI: Active (Connected)</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                          <span className="text-slate-300">Skillora Frame Analyzer: Active</span>
+                        </>
+                      )
+                    ) : (
+                      deepseekApiKey ? (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
+                          <span className="text-purple-300">DeepSeek AI: Connected (sk-...)</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                          <span className="text-amber-300">DeepSeek: Connect your sk-... key below</span>
+                        </>
+                      )
+                    )}
+                  </div>
 
-                      <div className="flex gap-2">
+                  {showApiKeyInput && (
+                    <div className="mt-2.5 p-3.5 rounded-xl bg-[#040814] border border-cyan-500/30 space-y-3">
+                      {/* Gemini Key Row */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-bold text-slate-300">
+                            1. Google Gemini API Key:
+                          </p>
+                          <a
+                            href="https://aistudio.google.com/apikey"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] text-cyan-400 hover:underline flex items-center gap-1"
+                          >
+                            Google AI Studio ↗
+                          </a>
+                        </div>
                         <input
                           type="text"
                           value={geminiApiKey}
                           onChange={(e) => setGeminiApiKey(e.target.value.trim())}
                           placeholder="AQ... or AIzaSy... key from Google AI Studio"
-                          className="flex-1 bg-[#02050e] border border-slate-700 p-2 rounded-lg text-xs text-white font-mono placeholder:text-slate-500"
+                          className="w-full bg-[#02050e] border border-slate-700 p-2 rounded-lg text-xs text-white font-mono placeholder:text-slate-500"
                         />
+                      </div>
+
+                      {/* DeepSeek Key Row */}
+                      <div className="space-y-1.5 pt-2 border-t border-slate-800">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-bold text-purple-300">
+                            2. DeepSeek API Key:
+                          </p>
+                          <a
+                            href="https://platform.deepseek.com/api_keys"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] text-purple-400 hover:underline flex items-center gap-1"
+                          >
+                            platform.deepseek.com ↗
+                          </a>
+                        </div>
+                        <input
+                          type="text"
+                          value={deepseekApiKey}
+                          onChange={(e) => setDeepseekApiKey(e.target.value.trim())}
+                          placeholder="sk-... key from DeepSeek Platform"
+                          className="w-full bg-[#02050e] border border-slate-700 p-2 rounded-lg text-xs text-white font-mono placeholder:text-slate-500"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
                         <button
                           type="button"
                           onClick={handleSaveGeminiKey}
-                          className="px-3.5 py-1.5 rounded-lg bg-cyan-400 text-slate-950 font-bold text-xs hover:brightness-110 cursor-pointer"
+                          className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold text-xs hover:brightness-110 cursor-pointer shadow-md shadow-cyan-400/20"
                         >
-                          Save
+                          Save API Keys
                         </button>
+                        {apiSaveToast && (
+                          <p className="text-emerald-400 text-[11px] font-bold">✓ API Keys updated & saved!</p>
+                        )}
                       </div>
-
-                      {geminiApiKey && !isValidGeminiKey(geminiApiKey) && (
-                        <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed">
-                          ⚠️ <strong>Key Format Tip:</strong> Google Gemini API key enter karein (starts with <code>AQ...</code> ya <code>AIzaSy...</code>).
-                        </div>
-                      )}
-
-                      {apiSaveToast && (
-                        <p className="text-emerald-400 text-[11px] font-bold">✓ API Key updated & saved!</p>
-                      )}
                     </div>
                   )}
                 </div>
