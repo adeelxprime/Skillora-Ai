@@ -155,33 +155,7 @@ export function PromptStudio() {
   const [copiedVideoPrompt, setCopiedVideoPrompt] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   
-  // AI Provider & Key Support (Gemini Vision + DeepSeek AI)
-  const [aiProvider, setAiProvider] = useState('gemini'); // 'gemini' | 'deepseek'
-  const [deepseekApiKey, setDeepseekApiKey] = useState(() => {
-    try {
-      return localStorage.getItem('skillora_deepseek_key') || '';
-    } catch (e) {
-      return '';
-    }
-  });
-
-  const [geminiApiKey, setGeminiApiKey] = useState(() => {
-    try {
-      return localStorage.getItem('skillora_gemini_key') || '';
-    } catch (e) {
-      return '';
-    }
-  });
   const [frameMetrics, setFrameMetrics] = useState({ r: 128, g: 128, b: 128, brightness: 128 });
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-  const [apiSaveToast, setApiSaveToast] = useState(false);
-  const [geminiStatusNote, setGeminiStatusNote] = useState('');
-
-  const isValidGeminiKey = (k) => {
-    if (typeof k !== 'string') return false;
-    const key = k.trim();
-    return (key.startsWith('AQ.') || key.startsWith('AIzaSy')) && key.length >= 35;
-  };
 
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -243,20 +217,36 @@ export function PromptStudio() {
 
   // Capture actual keyframe from HTML5 video element
   const captureFrameFromVideo = async () => {
-    if (!videoRef.current) return null;
+    if (!videoRef.current) return capturedKeyframe || null;
     const v = videoRef.current;
-    
-    // If at 0.0s and video has duration, seek to 1 second (or 25%) to avoid black fade-in frames!
-    if (v.currentTime < 0.2 && v.duration > 0.5) {
-      v.currentTime = Math.min(1.0, v.duration * 0.25);
+
+    // If metadata not ready, wait up to 800ms
+    if (v.readyState < 2) {
       await new Promise((resolve) => {
-        const onSeeked = () => {
-          v.removeEventListener('seeked', onSeeked);
+        const onLoaded = () => {
+          v.removeEventListener('loadeddata', onLoaded);
+          v.removeEventListener('canplay', onLoaded);
           resolve();
         };
-        v.addEventListener('seeked', onSeeked);
-        setTimeout(resolve, 350);
+        v.addEventListener('loadeddata', onLoaded);
+        v.addEventListener('canplay', onLoaded);
+        setTimeout(resolve, 800);
       });
+    }
+
+    // Seek slightly into the video if at 0.0s to avoid pure black intro frames
+    if (v.currentTime < 0.2 && v.duration > 0.5) {
+      try {
+        v.currentTime = Math.min(1.0, v.duration * 0.2);
+        await new Promise((resolve) => {
+          const onSeeked = () => {
+            v.removeEventListener('seeked', onSeeked);
+            resolve();
+          };
+          v.addEventListener('seeked', onSeeked);
+          setTimeout(resolve, 350);
+        });
+      } catch (e) {}
     }
 
     try {
@@ -300,12 +290,14 @@ export function PromptStudio() {
       }
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      setCapturedKeyframe(dataUrl);
-      return dataUrl;
+      if (dataUrl && dataUrl.length > 500) {
+        setCapturedKeyframe(dataUrl);
+        return dataUrl;
+      }
     } catch (err) {
       console.warn('Canvas frame capture warning:', err);
-      return null;
     }
+    return capturedKeyframe || null;
   };
 
   // Handle Video File Selection
@@ -349,11 +341,11 @@ export function PromptStudio() {
     }
   };
 
-  // Run AI Video Analysis (Google Gemini Vision AI or Skillora Frame Engine)
+  // Run AI Video Analysis (Google Gemini Vision AI on Server)
   const runVideoAnalysis = async (overridePreset = null) => {
     setIsAnalyzing(true);
     setAnalysisProgress(20);
-    setAnalysisStage('1/3: Capturing video keyframe...');
+    setAnalysisStage('1/3: Capturing video keyframe for AI Vision...');
 
     if (overridePreset) {
       setGeneratedVideoPrompt(overridePreset);
@@ -368,171 +360,54 @@ export function PromptStudio() {
       frameData = capturedKeyframe;
     }
 
-    if (!frameData) {
-      setIsAnalyzing(false);
-      alert('Video frame not ready. Please play the video for 1-2 seconds or pause on a clear scene and try again.');
-      return;
-    }
-
-    setAnalysisProgress(50);
-
     let detectedAr = '16:9';
     if (videoRef.current && videoRef.current.videoHeight > videoRef.current.videoWidth) {
       detectedAr = '9:16';
     }
 
-    const cleanKey = (geminiApiKey || '').trim();
-    const hasValidKey = isValidGeminiKey(cleanKey);
+    setAnalysisProgress(50);
+    setAnalysisStage('2/3: Google Gemini Multimodal AI analyzing scene physics...');
 
-    // 1. DeepSeek AI Provider Branch
-    if (aiProvider === 'deepseek') {
-      setAnalysisStage('2/3: DeepSeek AI reasoning scene prompts...');
-      const cleanDsKey = (deepseekApiKey || '').trim();
-      try {
-        const dsRes = await fetch('/api/extract', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-DeepSeek-Key': cleanDsKey
-          },
-          body: JSON.stringify({
-            provider: 'deepseek',
-            topic: userSceneTopic || selectedTopicChip || uploadedVideoFile?.name || 'cinematic video sequence',
-            aspect: detectedAr,
-            image: frameData
-          })
-        });
+    // 1. Call Backend /api/extract (Server handles Gemini Vision with active key)
+    try {
+      const apiRes = await fetch('/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: frameData || '',
+          topic: userSceneTopic || selectedTopicChip || (uploadedVideoFile ? uploadedVideoFile.name : ''),
+          aspect: detectedAr
+        })
+      });
 
-        if (dsRes.ok) {
-          const parsed = await dsRes.json();
-          if (parsed.masterPrompt) {
-            setGeneratedVideoPrompt({
-              name: uploadedVideoFile?.name || videoInfo.name || 'Analyzed Video',
-              aspect: detectedAr,
-              subject: parsed.subject || 'Visual Scene',
-              camera: parsed.camera || 'Cinematic Tracking Pan',
-              lighting: parsed.lighting || 'Volumetric Studio Lighting',
-              model: 'DeepSeek AI (V3 / R1)',
-              prompt: parsed.masterPrompt,
-              negative: parsed.negative || 'low quality, blurry, deformed anatomy, artifacts'
-            });
-            setAnalysisProgress(100);
-            setIsAnalyzing(false);
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn('DeepSeek call fallback:', e);
-      }
-    }
-
-    // 2. Google Gemini Vision API Provider Branch
-    if (aiProvider === 'gemini' && hasValidKey) {
-      setAnalysisStage('2/3: Google Gemini Vision AI extracting scene prompts...');
-      try {
-        const apiRes = await fetch('/api/extract', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Gemini-Key': cleanKey
-          },
-          body: JSON.stringify({ image: frameData })
-        });
-
-        if (apiRes.ok) {
-          const parsed = await apiRes.json();
-          if (parsed.masterPrompt) {
-            setGeneratedVideoPrompt({
-              name: uploadedVideoFile?.name || videoInfo.name || 'Analyzed Video',
-              aspect: detectedAr,
-              subject: parsed.subject || 'Visual Scene',
-              camera: parsed.camera || 'Cinematic Tracking Pan',
-              lighting: parsed.lighting || 'Volumetric Studio Lighting',
-              model: 'Google Gemini 3.5 Flash-Lite Vision',
-              prompt: parsed.masterPrompt,
-              negative: parsed.negative || 'low quality, blurry, deformed anatomy, artifacts'
-            });
-            setAnalysisProgress(100);
-            setIsAnalyzing(false);
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn('Backend /api/extract skipped:', e);
-      }
-
-      // Direct Gemini 3.5 Flash-Lite API fallback
-      try {
-        const cleanBase64 = frameData.replace(/^data:image\/\w+;base64,/, '');
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': cleanKey
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `You are an elite AI prompt engineer and extractor for video generators like Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, Sora, and Midjourney v6.1.
-Look at this video keyframe image carefully. Describe what is in this scene precisely and reverse-engineer the exact master AI video prompt to recreate it.
-Be extremely detailed about the subject, character/person, clothing, environment, lighting, and camera movement.
-
-Return ONLY a valid JSON object matching this schema (no markdown, no other text):
-{
-  "subject": "Detailed description of the subject, clothing, action and setting in this image",
-  "camera": "Camera shot, movement (e.g. low-angle tracking shot, 35mm lens dolly in, orbital pan) and lens angle",
-  "lighting": "Atmospheric lighting, contrast, god rays, neon reflections and color grade",
-  "masterPrompt": "The complete, rich master prompt ready to generate this exact scene in Kling AI or Runway Gen-3, with 4K 60fps --ar 9:16 --v 6.1 --style raw",
-  "negative": "blurry, low quality, deformed, extra limbs, bad face, artifacts, cartoon look"
-}`
-                    },
-                    {
-                      inline_data: {
-                        mime_type: 'image/jpeg',
-                        data: cleanBase64
-                      }
-                    }
-                  ]
-                }
-              ]
-            })
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
-          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) rawText = jsonMatch[0];
-          const parsed = JSON.parse(rawText);
-
+      if (apiRes.ok) {
+        const parsed = await apiRes.json();
+        if (parsed.masterPrompt) {
           setGeneratedVideoPrompt({
             name: uploadedVideoFile?.name || videoInfo.name || 'Analyzed Video',
             aspect: detectedAr,
-            subject: parsed.subject,
-            camera: parsed.camera,
-            lighting: parsed.lighting,
+            subject: parsed.subject || 'Visual Scene',
+            camera: parsed.camera || 'Cinematic Tracking Pan',
+            lighting: parsed.lighting || 'Volumetric Studio Lighting',
             model: 'Google Gemini 3.5 Flash-Lite Vision',
             prompt: parsed.masterPrompt,
-            negative: parsed.negative || 'low quality, blurry, artifacts, deformed anatomy'
+            negative: parsed.negative || 'low quality, blurry, deformed anatomy, artifacts'
           });
           setAnalysisProgress(100);
           setIsAnalyzing(false);
           return;
         }
-      } catch (err) {
-        console.warn('Direct Gemini call failed, continuing to Skillora Frame Engine:', err);
+      } else {
+        const errData = await apiRes.json().catch(() => ({}));
+        console.warn('Backend extract notice:', errData);
       }
+    } catch (e) {
+      console.warn('Backend /api/extract skipped:', e);
     }
 
-    // 2. Skillora Cinematic Frame & Physics Engine (Zero failure, immediate high-fidelity prompt)
+    // 2. Skillora Cinematic Frame & Physics Engine (Zero failure guaranteed fallback)
     setAnalysisStage('2/3: Skillora Engine analyzing motion physics & lighting...');
-    await new Promise((res) => setTimeout(res, 600));
+    await new Promise((res) => setTimeout(res, 500));
 
     const smartPrompt = generateScenePromptFromVideo({
       videoName: uploadedVideoFile?.name || videoInfo.name || 'video',
@@ -548,7 +423,7 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
       subject: smartPrompt.subject,
       camera: smartPrompt.camera,
       lighting: smartPrompt.lighting,
-      model: hasValidKey ? 'Google Gemini 3.5 Flash-Lite' : 'Skillora Cinematic Vision Engine',
+      model: 'Skillora Cinematic Vision Engine',
       prompt: smartPrompt.masterPrompt,
       negative: smartPrompt.negative
     });
@@ -577,15 +452,6 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
     navigator.clipboard.writeText(generatedVideoPrompt.prompt);
     setCopiedVideoPrompt(true);
     setTimeout(() => setCopiedVideoPrompt(false), 2000);
-  };
-
-  const handleSaveGeminiKey = () => {
-    localStorage.setItem('skillora_gemini_key', geminiApiKey.trim());
-    if (deepseekApiKey) {
-      localStorage.setItem('skillora_deepseek_key', deepseekApiKey.trim());
-    }
-    setApiSaveToast(true);
-    setTimeout(() => setApiSaveToast(false), 3000);
   };
 
   // ==================== 2. MANUAL BUILDER STATE ====================
@@ -822,7 +688,6 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
                         src={uploadedVideoUrl}
                         controls
                         playsInline
-                        crossOrigin="anonymous"
                         className="w-full h-full object-contain"
                         onLoadedData={() => captureFrameFromVideo()}
                         onSeeked={() => captureFrameFromVideo()}
@@ -893,139 +758,15 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
                   </div>
                 )}
 
-                {/* AI Provider Switcher (Gemini Vision vs DeepSeek AI) */}
-                <div className="mt-4 pt-3 border-t border-slate-800 space-y-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-300">AI Engine:</span>
-                      <div className="flex rounded-lg bg-slate-900/80 p-0.5 border border-slate-800">
-                        <button
-                          type="button"
-                          onClick={() => setAiProvider('gemini')}
-                          className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                            aiProvider === 'gemini'
-                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-sm'
-                              : 'text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          <span>✨ Google Gemini Vision</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAiProvider('deepseek')}
-                          className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                            aiProvider === 'deepseek'
-                              ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-sm'
-                              : 'text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          <span>🐳 DeepSeek AI</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKeyInput(!showApiKeyInput)}
-                      className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 transition cursor-pointer"
-                    >
-                      <Key className="w-3.5 h-3.5" />
-                      <span>{showApiKeyInput ? 'Hide Keys' : 'Manage API Keys'}</span>
-                    </button>
+                {/* AI Vision Status (Keys completely hidden) */}
+                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>AI Vision Engine: Active & Ready</span>
                   </div>
-
-                  <div className="flex items-center gap-1.5 text-xs font-semibold">
-                    {aiProvider === 'gemini' ? (
-                      isValidGeminiKey(geminiApiKey) ? (
-                        <>
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                          <span className="text-emerald-400">Gemini 3.5 Vision AI: Active (Connected)</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                          <span className="text-slate-300">Skillora Frame Analyzer: Active</span>
-                        </>
-                      )
-                    ) : (
-                      deepseekApiKey ? (
-                        <>
-                          <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
-                          <span className="text-purple-300">DeepSeek AI: Connected (sk-...)</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                          <span className="text-amber-300">DeepSeek: Connect your sk-... key below</span>
-                        </>
-                      )
-                    )}
-                  </div>
-
-                  {showApiKeyInput && (
-                    <div className="mt-2.5 p-3.5 rounded-xl bg-[#040814] border border-cyan-500/30 space-y-3">
-                      {/* Gemini Key Row */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[11px] font-bold text-slate-300">
-                            1. Google Gemini API Key:
-                          </p>
-                          <a
-                            href="https://aistudio.google.com/apikey"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[10px] text-cyan-400 hover:underline flex items-center gap-1"
-                          >
-                            Google AI Studio ↗
-                          </a>
-                        </div>
-                        <input
-                          type="text"
-                          value={geminiApiKey}
-                          onChange={(e) => setGeminiApiKey(e.target.value.trim())}
-                          placeholder="AQ... or AIzaSy... key from Google AI Studio"
-                          className="w-full bg-[#02050e] border border-slate-700 p-2 rounded-lg text-xs text-white font-mono placeholder:text-slate-500"
-                        />
-                      </div>
-
-                      {/* DeepSeek Key Row */}
-                      <div className="space-y-1.5 pt-2 border-t border-slate-800">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[11px] font-bold text-purple-300">
-                            2. DeepSeek API Key:
-                          </p>
-                          <a
-                            href="https://platform.deepseek.com/api_keys"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[10px] text-purple-400 hover:underline flex items-center gap-1"
-                          >
-                            platform.deepseek.com ↗
-                          </a>
-                        </div>
-                        <input
-                          type="text"
-                          value={deepseekApiKey}
-                          onChange={(e) => setDeepseekApiKey(e.target.value.trim())}
-                          placeholder="sk-... key from DeepSeek Platform"
-                          className="w-full bg-[#02050e] border border-slate-700 p-2 rounded-lg text-xs text-white font-mono placeholder:text-slate-500"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between pt-1">
-                        <button
-                          type="button"
-                          onClick={handleSaveGeminiKey}
-                          className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold text-xs hover:brightness-110 cursor-pointer shadow-md shadow-cyan-400/20"
-                        >
-                          Save API Keys
-                        </button>
-                        {apiSaveToast && (
-                          <p className="text-emerald-400 text-[11px] font-bold">✓ API Keys updated & saved!</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  <span className="text-[11px] text-cyan-400 font-mono">
+                    Runway Gen-3 • Kling 1.5 • Luma
+                  </span>
                 </div>
 
               </div>

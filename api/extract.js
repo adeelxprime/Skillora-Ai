@@ -67,33 +67,14 @@ Return JSON:
 
     // 2. Google Gemini Vision Provider
     const image = body?.image;
-    const key = (req.headers['x-gemini-key'] || process.env.VITE_GEMINI_API_KEY || '').trim();
+    const key = (req.headers['x-gemini-key'] || process.env.VITE_GEMINI_API_KEY || 'AQ.Ab8RN6J0aR8hBkLQkUnrLe0TrNnHUjKo_5Xc9zzBZnitk8qlGg').trim();
 
-    if (!key || (!key.startsWith('AQ.') && !key.startsWith('AIzaSy'))) {
-      return res.status(400).json({ error: 'Valid Google Gemini API key required' });
-    }
+    const cleanBase64 = (image || '').replace(/^data:image\/\w+;base64,/, '');
 
-    if (!image) {
-      return res.status(400).json({ error: 'No video frame provided for extraction' });
-    }
-
-    const cleanBase64 = image.replace(/^data:image\/\w+;base64,/, '');
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`,
+    const parts = [
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': key
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `You are an expert AI prompt engineer and extractor for video generators like Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, Sora, and Midjourney v6.1.
-Look at this video keyframe image carefully. Describe what is in this scene precisely and reverse-engineer the exact master AI video prompt to recreate it.
+        text: `You are an elite AI prompt engineer and extractor for video generators like Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, Sora, and Midjourney v6.1.
+Look at this video scene carefully. Describe what is in this scene precisely and reverse-engineer the exact master AI video prompt to recreate it.
 Be extremely detailed about the subject, clothing, environment, lighting, and camera movement.
 
 Return ONLY a valid JSON object matching this schema (no markdown, no other text):
@@ -101,13 +82,20 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
   "subject": "Detailed description of the subject, clothing, action and setting in this image",
   "camera": "Camera shot, movement (e.g. low-angle tracking shot, 35mm lens dolly in, orbital pan) and lens angle",
   "lighting": "Atmospheric lighting, contrast, god rays, neon reflections and color grade",
-  "masterPrompt": "The complete, rich master prompt ready to generate this exact scene in Kling AI or Runway Gen-3, with 4K 60fps --ar 9:16 --v 6.1 --style raw",
+  "masterPrompt": "The complete, rich master prompt ready to generate this exact scene in Kling AI or Runway Gen-3, with 4K 60fps --ar ${body.aspect || '16:9'} --v 6.1 --style raw",
   "negative": "blurry, low quality, deformed, extra limbs, bad face, artifacts, cartoon look"
 }`
-                },
-                {
-                  inline_data: {
-                    mime_type: 'image/jpeg',
+      }
+    ];
+
+    if (cleanBase64) {
+      parts.push({
+        inline_data: {
+          mime_type: 'image/jpeg',
+          data: cleanBase64
+        }
+      });
+    }
                     data: cleanBase64
                   }
                 }
