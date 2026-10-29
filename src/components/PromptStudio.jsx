@@ -155,17 +155,20 @@ export function PromptStudio() {
   const [copiedVideoPrompt, setCopiedVideoPrompt] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   
+  const DEFAULT_GEMINI_KEY = 'AQ.Ab8RN6J0aR8hBkLQkUnrLe0TrNnHUjKo_5Xc9zzBZnitk8qlGg';
+
   // Gemini AI Vision Key Support
   const [geminiApiKey, setGeminiApiKey] = useState(() => {
     try {
       const saved = localStorage.getItem('skillora_gemini_key') || '';
-      if (saved.startsWith('AQ.')) {
-        localStorage.removeItem('skillora_gemini_key');
-        return '';
+      // If user has old non-working key saved, upgrade to the active working key
+      if (!saved || saved === 'AQ.Ab8RN6L9Gp6zgj9glLaSf8dKnfaQD2kJvCb_U5TBJovYL3G5ew') {
+        localStorage.setItem('skillora_gemini_key', DEFAULT_GEMINI_KEY);
+        return DEFAULT_GEMINI_KEY;
       }
       return saved;
     } catch (e) {
-      return '';
+      return DEFAULT_GEMINI_KEY;
     }
   });
   const [frameMetrics, setFrameMetrics] = useState({ r: 128, g: 128, b: 128, brightness: 128 });
@@ -173,7 +176,11 @@ export function PromptStudio() {
   const [apiSaveToast, setApiSaveToast] = useState(false);
   const [geminiStatusNote, setGeminiStatusNote] = useState('');
 
-  const isValidGeminiKey = (k) => typeof k === 'string' && k.trim().startsWith('AIzaSy') && k.trim().length >= 35;
+  const isValidGeminiKey = (k) => {
+    if (typeof k !== 'string') return false;
+    const key = k.trim();
+    return (key.startsWith('AQ.') || key.startsWith('AIzaSy')) && key.length >= 35;
+  };
 
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -415,10 +422,13 @@ export function PromptStudio() {
       try {
         const cleanBase64 = frameData.replace(/^data:image\/\w+;base64,/, '');
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${cleanKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': cleanKey
+            },
             body: JSON.stringify({
               contents: [
                 {
@@ -885,7 +895,7 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
                           type="text"
                           value={geminiApiKey}
                           onChange={(e) => setGeminiApiKey(e.target.value.trim())}
-                          placeholder="Paste AIzaSy... key from Google AI Studio"
+                          placeholder="AQ... or AIzaSy... key from Google AI Studio"
                           className="flex-1 bg-[#02050e] border border-slate-700 p-2 rounded-lg text-xs text-white font-mono placeholder:text-slate-500"
                         />
                         <button
@@ -899,7 +909,7 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
 
                       {geminiApiKey && !isValidGeminiKey(geminiApiKey) && (
                         <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed">
-                          ⚠️ <strong>Key Format Tip:</strong> Google Gemini API key hamesha <code>AIzaSy...</code> se shuru hoti hai. Apne browser ke dusre tab (Google AI Studio) me jaakar <strong>"Copy Key"</strong> karein aur yahan paste karein.
+                          ⚠️ <strong>Key Format Tip:</strong> Google Gemini API key enter karein (starts with <code>AQ...</code> ya <code>AIzaSy...</code>).
                         </div>
                       )}
 

@@ -15,10 +15,10 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const image = body?.image;
-    const key = (req.headers['x-gemini-key'] || process.env.VITE_GEMINI_API_KEY || '').trim();
+    const key = (req.headers['x-gemini-key'] || process.env.VITE_GEMINI_API_KEY || 'AQ.Ab8RN6J0aR8hBkLQkUnrLe0TrNnHUjKo_5Xc9zzBZnitk8qlGg').trim();
 
-    if (!key || !key.startsWith('AIzaSy')) {
-      return res.status(400).json({ error: 'Valid Google Gemini API key required (starts with AIzaSy...)' });
+    if (!key || (!key.startsWith('AQ.') && !key.startsWith('AIzaSy'))) {
+      return res.status(400).json({ error: 'Valid Google Gemini API key required' });
     }
 
     if (!image) {
@@ -28,10 +28,13 @@ export default async function handler(req, res) {
     const cleanBase64 = image.replace(/^data:image\/\w+;base64,/, '');
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${key.trim()}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key
+        },
         body: JSON.stringify({
           contents: [
             {

@@ -17,12 +17,12 @@ export default defineConfig({
             req.on('end', async () => {
               try {
                 const body = JSON.parse(Buffer.concat(chunks).toString());
-                const key = (req.headers['x-gemini-key'] || process.env.VITE_GEMINI_API_KEY || '').trim();
+                const key = (req.headers['x-gemini-key'] || process.env.VITE_GEMINI_API_KEY || 'AQ.Ab8RN6J0aR8hBkLQkUnrLe0TrNnHUjKo_5Xc9zzBZnitk8qlGg').trim();
                 const imageData = (body.image || '').replace(/^data:image\/\w+;base64,/, '');
 
-                if (!key || !key.startsWith('AIzaSy')) {
+                if (!key || (!key.startsWith('AQ.') && !key.startsWith('AIzaSy'))) {
                   res.writeHead(400, { 'Content-Type': 'application/json' });
-                  res.end(JSON.stringify({ error: 'Valid Google AI Studio Gemini API key (AIzaSy...) required' }));
+                  res.end(JSON.stringify({ error: 'Valid Google AI Studio Gemini API key required' }));
                   return;
                 }
 
@@ -33,10 +33,13 @@ export default defineConfig({
                 }
 
                 const response = await fetch(
-                  `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${key}`,
+                  `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`,
                   {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'x-goog-api-key': key
+                    },
                     body: JSON.stringify({
                       contents: [
                         {
