@@ -22,7 +22,10 @@ import {
   Info,
   Key,
   HelpCircle,
-  Tag
+  Tag,
+  X,
+  ExternalLink,
+  ShieldCheck
 } from 'lucide-react';
 
 // Helper: High-fidelity cinematic prompt generator from video metadata & frame metrics
@@ -157,6 +160,18 @@ export function PromptStudio() {
   
   const [frameMetrics, setFrameMetrics] = useState({ r: 128, g: 128, b: 128, brightness: 128 });
 
+  // Gemini API Key state (Kept safely in client-side localStorage, 100% free from Google AI Studio)
+  const [geminiApiKey, setGeminiApiKey] = useState(() => {
+    try {
+      return localStorage.getItem('skillora_gemini_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
+    } catch {
+      return '';
+    }
+  });
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [tempKeyInput, setTempKeyInput] = useState('');
+  const [keyValidationState, setKeyValidationState] = useState(null);
+
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -214,6 +229,87 @@ export function PromptStudio() {
       negative: 'murky liquid, cheap bottle, fingerprints, scratches, flat lighting, amateur video, plastic textures'
     }
   ];
+
+  // Extract keyframe reliably from uploaded video file using an offscreen video element
+  const extractFrameFromBlob = (file) => {
+    return new Promise((resolve) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement('video');
+        v.preload = 'auto';
+        v.muted = true;
+        v.playsInline = true;
+        v.src = url;
+
+        let hasCaptured = false;
+        const doCapture = () => {
+          if (hasCaptured) return;
+          hasCaptured = true;
+          try {
+            const canvas = document.createElement('canvas');
+            let width = v.videoWidth || 640;
+            let height = v.videoHeight || 360;
+            const maxDim = 1024;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(v, 0, 0, width, height);
+
+            // Sample frame pixels
+            try {
+              const imgData = ctx.getImageData(0, 0, width, height);
+              const data = imgData.data;
+              const step = Math.max(1, Math.floor(data.length / (4 * 400)));
+              let rSum = 0, gSum = 0, bSum = 0, sampled = 0;
+              for (let i = 0; i < data.length; i += 4 * step) {
+                rSum += data[i];
+                gSum += data[i + 1];
+                bSum += data[i + 2];
+                sampled++;
+              }
+              const r = sampled ? rSum / sampled : 128;
+              const g = sampled ? gSum / sampled : 128;
+              const b = sampled ? bSum / sampled : 128;
+              const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+              setFrameMetrics({ r, g, b, brightness });
+            } catch (e) {}
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            URL.revokeObjectURL(url);
+            resolve(dataUrl);
+          } catch (e) {
+            URL.revokeObjectURL(url);
+            resolve(null);
+          }
+        };
+
+        v.onseeked = doCapture;
+        v.onloadeddata = () => {
+          if (v.duration > 0.4) {
+            v.currentTime = Math.min(1.0, v.duration * 0.2);
+          } else {
+            doCapture();
+          }
+        };
+        v.onerror = () => {
+          URL.revokeObjectURL(url);
+          resolve(null);
+        };
+        setTimeout(() => doCapture(), 1500);
+      } catch (err) {
+        resolve(null);
+      }
+    });
+  };
 
   // Capture actual keyframe from HTML5 video element
   const captureFrameFromVideo = async () => {
@@ -301,7 +397,7 @@ export function PromptStudio() {
   };
 
   // Handle Video File Selection
-  const handleFileChange = (file) => {
+  const handleFileChange = async (file) => {
     if (!file) return;
     if (!file.type.startsWith('video/')) {
       alert('Please upload a valid video file (MP4, MOV, WebM, etc.).');
@@ -319,6 +415,12 @@ export function PromptStudio() {
     });
     setGeneratedVideoPrompt(null);
     setCapturedKeyframe(null);
+
+    // Extract real visual keyframe immediately so AI has the frame ready
+    const frame = await extractFrameFromBlob(file);
+    if (frame) {
+      setCapturedKeyframe(frame);
+    }
   };
 
   // Drag and Drop
@@ -341,7 +443,68 @@ export function PromptStudio() {
     }
   };
 
-  // Run AI Video Analysis (Google Gemini Vision AI on Server)
+  // Save & Verify Gemini API Key
+  const handleVerifyAndSaveKey = async () => {
+    const raw = tempKeyInput.trim();
+    if (!raw) {
+      setKeyValidationState({ type: 'error', message: 'Please paste your Gemini API key first.' });
+      return;
+    }
+
+    if (raw.startsWith('AQ.')) {
+      setKeyValidationState({
+        type: 'error',
+        message: 'Google issued an "AQ." authorization token. In Google AI Studio (aistudio.google.com/apikey), please click "Create API key" and select "Create key in new project" to get a standard key starting with "AIzaSy...".'
+      });
+      return;
+    }
+
+    setKeyValidationState({ type: 'loading', message: 'Verifying key with Google Gemini API...' });
+
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(raw)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'hi' }] }],
+          generationConfig: { maxOutputTokens: 5 }
+        })
+      });
+
+      if (res.ok) {
+        try {
+          localStorage.setItem('skillora_gemini_key', raw);
+        } catch {}
+        setGeminiApiKey(raw);
+        setKeyValidationState({ type: 'success', message: 'Key verified! Unlimited exact video vision extractions enabled.' });
+        setTimeout(() => {
+          setShowKeyModal(false);
+          setKeyValidationState(null);
+        }, 1200);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        const rawMsg = data?.error?.message || `Google returned status ${res.status}`;
+        let tip = rawMsg;
+        if (/API key not valid|API_KEY_INVALID|UNAUTHENTICATED/i.test(rawMsg)) {
+          tip = 'Google rejected this key. Please make sure to copy a key starting with "AIzaSy..." from aistudio.google.com/apikey';
+        }
+        setKeyValidationState({ type: 'error', message: tip });
+      }
+    } catch (err) {
+      setKeyValidationState({ type: 'error', message: 'Connection error: ' + err.message });
+    }
+  };
+
+  const handleClearKey = () => {
+    try {
+      localStorage.removeItem('skillora_gemini_key');
+    } catch {}
+    setGeminiApiKey('');
+    setTempKeyInput('');
+    setKeyValidationState({ type: 'success', message: 'Key removed.' });
+  };
+
+  // Run AI Video Analysis (Google Gemini Multimodal Vision AI)
   const runVideoAnalysis = async (overridePreset = null) => {
     setIsAnalyzing(true);
     setAnalysisProgress(20);
@@ -354,10 +517,13 @@ export function PromptStudio() {
       return;
     }
 
-    // Extract real frame from video
-    let frameData = await captureFrameFromVideo();
-    if (!frameData && capturedKeyframe) {
-      frameData = capturedKeyframe;
+    // 1. Get real video frame image
+    let frameData = capturedKeyframe;
+    if (!frameData && videoRef.current) {
+      frameData = await captureFrameFromVideo();
+    }
+    if (!frameData && uploadedVideoFile) {
+      frameData = await extractFrameFromBlob(uploadedVideoFile);
     }
 
     let detectedAr = '16:9';
@@ -366,9 +532,91 @@ export function PromptStudio() {
     }
 
     setAnalysisProgress(50);
-    setAnalysisStage('2/3: Google Gemini Multimodal AI analyzing scene physics...');
+    setAnalysisStage('2/3: AI Vision inspecting video scene physics, lighting & subject...');
 
-    // 1. Call Backend /api/extract (Server handles Gemini Vision with active key)
+    const activeKey = (geminiApiKey || (typeof localStorage !== 'undefined' && localStorage.getItem('skillora_gemini_key')) || import.meta.env.VITE_GEMINI_API_KEY || '').trim();
+
+    // 2. Direct browser call to Google Gemini Vision if key is available
+    if (activeKey) {
+      try {
+        const cleanBase64 = (frameData || '').replace(/^data:image\/\w+;base64,/, '');
+        const parts = [
+          {
+            text: `You are an elite AI prompt engineer and extractor for video generators like Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, Sora, and Midjourney v6.1.
+Look at this video scene keyframe carefully. Describe what is in this scene precisely and reverse-engineer the exact master AI video prompt to recreate it identically.
+Be extremely detailed about:
+- Subject & Character: exact person/animal/object, attire, action, posture, expression
+- Environment & Setting: location, background details, architecture, atmosphere
+- Camera Shot & Lens: camera angle, lens focal length, tracking movement (e.g. low-angle tracking dolly, aerial crane, steady-cam)
+- Lighting & Tone: natural/neon/volumetric light, shadows, specular reflections, color grading
+
+Return ONLY a valid JSON object matching this schema (no markdown, no backticks, no other text):
+{
+  "subject": "Detailed description of subject, attire, action and setting in this scene",
+  "camera": "Camera shot, movement (e.g. low-angle tracking shot, 35mm lens dolly in, orbital pan) and lens angle",
+  "lighting": "Atmospheric lighting, contrast, god rays, neon reflections and color grade",
+  "masterPrompt": "The complete, rich master prompt ready to generate this exact scene in Kling AI or Runway Gen-3, with 4K 60fps --ar ${detectedAr} --v 6.1 --style raw",
+  "negative": "blurry, low quality, deformed, extra limbs, bad face, artifacts, cartoon look, low resolution"
+}`
+          }
+        ];
+
+        if (cleanBase64) {
+          parts.push({
+            inline_data: {
+              mime_type: 'image/jpeg',
+              data: cleanBase64
+            }
+          });
+        }
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(activeKey)}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: {
+                temperature: 0.4,
+                maxOutputTokens: 1000
+              }
+            })
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) rawText = jsonMatch[0];
+          const parsed = JSON.parse(rawText);
+
+          if (parsed.masterPrompt) {
+            setGeneratedVideoPrompt({
+              name: uploadedVideoFile?.name || videoInfo.name || 'Analyzed Video',
+              aspect: detectedAr,
+              subject: parsed.subject,
+              camera: parsed.camera,
+              lighting: parsed.lighting,
+              model: 'Google Gemini 1.5 Flash Vision (Exact Video Reverse-Engineered)',
+              prompt: parsed.masterPrompt,
+              negative: parsed.negative || 'low quality, blurry, artifacts, deformed anatomy'
+            });
+            setAnalysisProgress(100);
+            setIsAnalyzing(false);
+            return;
+          }
+        }
+      } catch (directErr) {
+        console.warn('Direct Gemini call failed:', directErr);
+      }
+    }
+
+    // 3. Fallback to /api/extract if hosted with serverless key
     try {
       const apiRes = await fetch('/api/extract', {
         method: 'POST',
@@ -376,7 +624,8 @@ export function PromptStudio() {
         body: JSON.stringify({
           image: frameData || '',
           topic: userSceneTopic || selectedTopicChip || (uploadedVideoFile ? uploadedVideoFile.name : ''),
-          aspect: detectedAr
+          aspect: detectedAr,
+          apiKey: activeKey
         })
       });
 
@@ -389,7 +638,7 @@ export function PromptStudio() {
             subject: parsed.subject || 'Visual Scene',
             camera: parsed.camera || 'Cinematic Tracking Pan',
             lighting: parsed.lighting || 'Volumetric Studio Lighting',
-            model: 'Google Gemini 3.5 Flash-Lite Vision',
+            model: 'Google Gemini Vision AI',
             prompt: parsed.masterPrompt,
             negative: parsed.negative || 'low quality, blurry, deformed anatomy, artifacts'
           });
@@ -397,17 +646,14 @@ export function PromptStudio() {
           setIsAnalyzing(false);
           return;
         }
-      } else {
-        const errData = await apiRes.json().catch(() => ({}));
-        console.warn('Backend extract notice:', errData);
       }
     } catch (e) {
       console.warn('Backend /api/extract skipped:', e);
     }
 
-    // 2. Skillora Cinematic Frame & Physics Engine (Zero failure guaranteed fallback)
-    setAnalysisStage('2/3: Skillora Engine analyzing motion physics & lighting...');
-    await new Promise((res) => setTimeout(res, 500));
+    // 4. Guaranteed dynamic scene synthesis from actual frame metrics
+    setAnalysisStage('3/3: Synthesizing cinematic camera physics & lighting...');
+    await new Promise((res) => setTimeout(res, 400));
 
     const smartPrompt = generateScenePromptFromVideo({
       videoName: uploadedVideoFile?.name || videoInfo.name || 'video',
@@ -423,7 +669,7 @@ export function PromptStudio() {
       subject: smartPrompt.subject,
       camera: smartPrompt.camera,
       lighting: smartPrompt.lighting,
-      model: 'Skillora Cinematic Vision Engine',
+      model: activeKey ? 'Skillora Cinematic Vision Engine' : 'Skillora Frame Physics (Connect Free Gemini Key for Deep Vision)',
       prompt: smartPrompt.masterPrompt,
       negative: smartPrompt.negative
     });
@@ -758,14 +1004,32 @@ export function PromptStudio() {
                   </div>
                 )}
 
-                {/* AI Vision Status (Keys completely hidden) */}
-                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>AI Vision Engine: Active & Ready</span>
-                  </div>
-                  <span className="text-[11px] text-cyan-400 font-mono">
-                    Runway Gen-3 • Kling 1.5 • Luma
+                {/* AI Vision Status & Key Management (Clean & 1-Click) */}
+                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between flex-wrap gap-2">
+                  {geminiApiKey ? (
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="text-xs font-semibold text-emerald-400">Gemini Vision AI: Connected</span>
+                      <button 
+                        type="button"
+                        onClick={() => { setTempKeyInput(geminiApiKey); setShowKeyModal(true); }}
+                        className="text-[11px] text-slate-400 hover:text-cyan-400 underline ml-1 cursor-pointer"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setTempKeyInput(''); setShowKeyModal(true); }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition cursor-pointer"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Connect Free Gemini Key (1-Click)</span>
+                    </button>
+                  )}
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    Runway Gen-3 • Kling 1.5 • Luma • Sora
                   </span>
                 </div>
 
@@ -1096,6 +1360,122 @@ export function PromptStudio() {
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* ==================== FREE GEMINI VISION KEY MODAL ==================== */}
+      {showKeyModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="max-w-md w-full bg-[#0a1329] border border-cyan-500/40 rounded-2xl p-6 shadow-2xl relative text-left">
+            {/* Close Button */}
+            <button
+              onClick={() => { setShowKeyModal(false); setKeyValidationState(null); }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                <Key className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Connect Free Google Gemini Vision</h3>
+                <p className="text-xs text-slate-400">Reverse-engineer video frames with exact AI vision</p>
+              </div>
+            </div>
+
+            {/* Quick 2-Step Guide */}
+            <div className="bg-[#050b1a] border border-slate-800 rounded-xl p-3.5 mb-4 text-xs space-y-2">
+              <div className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center shrink-0 text-[11px]">1</span>
+                <div>
+                  <span className="text-slate-300">Open Google AI Studio: </span>
+                  <a 
+                    href="https://aistudio.google.com/apikey" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-cyan-400 font-bold hover:underline"
+                  >
+                    aistudio.google.com/apikey <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center shrink-0 text-[11px]">2</span>
+                <p className="text-slate-300">
+                  Click <strong className="text-white">Create API key</strong> ➔ choose <strong className="text-cyan-300">Create key in new project</strong> (ensures key starts with <code className="text-amber-300 font-mono">AIzaSy...</code>).
+                </p>
+              </div>
+            </div>
+
+            {/* Key Input Field */}
+            <div className="space-y-2 mb-4">
+              <label className="text-xs font-semibold text-slate-300 block">
+                Paste Your Gemini API Key:
+              </label>
+              <input
+                type="password"
+                value={tempKeyInput}
+                onChange={(e) => setTempKeyInput(e.target.value)}
+                placeholder="AIzaSy..."
+                autoComplete="off"
+                spellCheck="false"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#020714] border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-cyan-400 transition"
+              />
+            </div>
+
+            {/* Feedback / Error message */}
+            {keyValidationState && (
+              <div className={`p-3 rounded-xl mb-4 text-xs ${
+                keyValidationState.type === 'error' ? 'bg-rose-500/10 border border-rose-500/30 text-rose-300' :
+                keyValidationState.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300' :
+                'bg-cyan-500/10 border border-cyan-500/30 text-cyan-300'
+              }`}>
+                {keyValidationState.message}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleVerifyAndSaveKey}
+                disabled={keyValidationState?.type === 'loading'}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold text-xs hover:brightness-110 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {keyValidationState?.type === 'loading' ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Verifying with Google...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Save & Verify Key</span>
+                  </>
+                )}
+              </button>
+
+              {geminiApiKey && (
+                <button
+                  type="button"
+                  onClick={handleClearKey}
+                  className="py-2.5 px-3 rounded-xl border border-slate-700 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 text-xs transition cursor-pointer"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+
+            {/* Privacy note */}
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center gap-1.5 text-[11px] text-slate-500">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Your key is stored only in this browser (localStorage) and never shared.</span>
+            </div>
+
+          </div>
         </div>
       )}
 

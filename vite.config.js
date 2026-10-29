@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const DEFAULT_GEMINI_KEY = env.VITE_GEMINI_API_KEY || 'AQ.Ab8RN6J0aR8hBkLQkUnrLe0TrNnHUjKo_5Xc9zzBZnitk8qlGg';
+  const DEFAULT_GEMINI_KEY = env.VITE_GEMINI_API_KEY || '';
 
   return {
     plugins: [
@@ -109,13 +109,18 @@ Return ONLY a valid JSON object matching this schema (no markdown, no other text
                     });
                   }
 
+                  if (!key) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Gemini API key is required' }));
+                    return;
+                  }
+
                   const response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`,
                     {
                       method: 'POST',
                       headers: {
-                        'Content-Type': 'application/json',
-                        'x-goog-api-key': key
+                        'Content-Type': 'application/json'
                       },
                       body: JSON.stringify({
                         contents: [
