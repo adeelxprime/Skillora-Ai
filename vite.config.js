@@ -17,8 +17,14 @@ export default defineConfig({
             req.on('end', async () => {
               try {
                 const body = JSON.parse(Buffer.concat(chunks).toString());
-                const key = req.headers['x-gemini-key'] || process.env.VITE_GEMINI_API_KEY || 'AQ.Ab8RN6L9Gp6zgj9glLaSf8dKnfaQD2kJvCb_U5TBJovYL3G5ew';
+                const key = (req.headers['x-gemini-key'] || process.env.VITE_GEMINI_API_KEY || '').trim();
                 const imageData = (body.image || '').replace(/^data:image\/\w+;base64,/, '');
+
+                if (!key || !key.startsWith('AIzaSy')) {
+                  res.writeHead(400, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ error: 'Valid Google AI Studio Gemini API key (AIzaSy...) required' }));
+                  return;
+                }
 
                 if (!imageData) {
                   res.writeHead(400, { 'Content-Type': 'application/json' });
