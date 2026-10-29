@@ -538,6 +538,7 @@ export default function App() {
             setIsProMember(true);
             alert('🎉 Pro mode activated in preview! You can now view all premium prompts.');
           }}
+          siteConfig={siteConfig}
         />
       )}
 

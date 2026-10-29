@@ -676,6 +676,222 @@ export const INITIAL_PROMPTS = [
       guidanceScale: '3.0',
       sampler: 'DPM++ SDE'
     }
+  },
+
+  // 12. Cyberpunk Ronin Assassin in Shinjuku Rain (FREE IMAGE)
+  {
+    id: 2001021,
+    numericId: 1021,
+    type: 'image',
+    title: 'Cyberpunk Ronin Assassin in Shinjuku Rain',
+    slug: 'cyberpunk-ronin-assassin-shinjuku',
+    category: 'Sci-Fi & Cyberpunk',
+    categoryId: 'scifi',
+    access: 'free',
+    isTrending: true,
+    aspectRatio: '4:5',
+    model: 'Midjourney v6.1 / Flux.1',
+    publishedLabel: 'Just now',
+    coverImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=800&q=80',
+    tags: ['Cyberpunk', 'Ronin', 'Samurai', 'Rain', 'Neon', 'Katana'],
+    description: 'Hyper-detailed futuristic cyber-samurai standing under torrential rain in Neo-Shinjuku with glowing turquoise neon katana and holographic visor reflections.',
+    promptText: `Full-body cinematic portrait of a cybernetic ronin assassin standing on wet asphalt in a rainy Neo-Tokyo alleyway at midnight. Matte carbon-fiber armor with glowing turquoise fiber optics, translucent raincoat with realistic water droplets, holding an illuminated cyan energy katana. Chiaroscuro lighting, neon holographic signs reflecting in puddles, steam rising from sewer grates, anamorphic 85mm f/1.4 lens, hyper-realistic skin texture, Blade Runner aesthetic --ar 4:5 --v 6.1 --style raw`,
+    negativePrompt: `cartoon, anime drawing, low quality, bad anatomy, deformed fingers, blurry, oversaturated`,
+    settings: {
+      aspectRatio: '4:5',
+      recommendedModel: 'Midjourney v6.1 / Flux.1 Pro',
+      guidanceScale: '3.5',
+      sampler: 'Euler A'
+    }
+  },
+
+  // 13. Bioluminescent Abyssal Jellyfish Galaxy Cavern (FREE IMAGE)
+  {
+    id: 2001022,
+    numericId: 1022,
+    type: 'image',
+    title: 'Bioluminescent Abyssal Jellyfish Galaxy Cavern',
+    slug: 'bioluminescent-jellyfish-galaxy-cavern',
+    category: 'Nature & Wildlife',
+    categoryId: 'nature',
+    access: 'free',
+    isTrending: true,
+    aspectRatio: '16:9',
+    model: 'Midjourney v6.1',
+    publishedLabel: 'Just now',
+    coverImage: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80',
+    tags: ['Deep Sea', 'Bioluminescence', 'Jellyfish', 'Nature', 'Underwater'],
+    description: 'Mesmerizing ethereal underwater photography of giant glowing translucent jellyfish illuminating a submerged crystalline cavern with cyan and violet light.',
+    promptText: `National Geographic underwater macro photography, giant translucent deep-sea bell jellyfish pulsating through an ancient submerged crystal cavern. Bioluminescent internal organs glowing in neon cyan and soft violet, delicate trailing tentacles with sparkling caustics, volumetric god rays piercing from surface through crystal-clear dark water, extreme micro-detail, shot on Sony A1 in Nauticam underwater housing --ar 16:9 --v 6.1 --style raw`,
+    negativePrompt: `lowres, murky water, plastic look, blurry, distorted tentacles, cartoon`,
+    settings: {
+      aspectRatio: '16:9',
+      recommendedModel: 'Midjourney v6.1',
+      guidanceScale: '4.0',
+      sampler: 'DPM++ 2M'
+    }
+  },
+
+  // 14. Vogue Haute Couture Baroque Empress in Gilded Palace (PREMIUM IMAGE)
+  {
+    id: 2001023,
+    numericId: 1023,
+    type: 'image',
+    title: 'Vogue Haute Couture Baroque Empress in Gilded Palace',
+    slug: 'vogue-haute-couture-baroque-empress',
+    category: 'Portraits & People',
+    categoryId: 'portrait',
+    access: 'premium',
+    isTrending: true,
+    aspectRatio: '4:5',
+    model: 'Flux.1 Pro / Midjourney',
+    publishedLabel: 'Just now',
+    coverImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+    tags: ['Fashion', 'Vogue', 'Baroque', 'Editorial', 'Portrait', 'Luxury'],
+    description: 'High-fashion editorial portrait of an aristocratic model wearing an extravagant golden filigree gown inside a grand Versailles hall with soft window daylight.',
+    promptText: `High-fashion editorial cover shot for Vogue Italia, an elegant high-fashion model posing in a grand Parisian baroque ballroom. Wearing a handcrafted gown made of heavy black silk velvet embroidered with 24k gold filigree lace, pearl headpiece, natural skin texture with subtle freckles, soft north-facing window light, chiaroscuro shadows, Hasselblad H6D-100c, 100mm f/2.2 portrait lens, master composition --ar 4:5 --v 6.1 --style raw`,
+    negativePrompt: `smooth airbrushed skin, plastic doll look, cartoon, bad eyes, extra fingers, low resolution`,
+    settings: {
+      aspectRatio: '4:5',
+      recommendedModel: 'Flux.1 Pro',
+      guidanceScale: '3.2',
+      sampler: 'DPM++ SDE'
+    }
+  },
+
+  // 15. 1970s Monaco Rainy Formula 1 Vintage Grand Prix Pitstop (FREE IMAGE)
+  {
+    id: 2001024,
+    numericId: 1024,
+    type: 'image',
+    title: '1970s Monaco Rainy Formula 1 Vintage Grand Prix Pitstop',
+    slug: '1970s-monaco-rainy-formula-1-grand-prix',
+    category: 'Cinematic & Film',
+    categoryId: 'cinematic',
+    access: 'free',
+    isTrending: false,
+    aspectRatio: '16:9',
+    model: 'Midjourney v6.1',
+    publishedLabel: 'Just now',
+    coverImage: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=800&q=80',
+    tags: ['Motorsport', 'Vintage', '1970s', 'Formula 1', 'Cinematic', 'Rain'],
+    description: 'Archival 1970s 35mm film photography of a classic scarlet red racecar making a frantic pitstop during a rainstorm at Monaco harbor.',
+    promptText: `Archival 35mm Kodachrome documentary film still of a classic 1974 scarlet red Formula 1 racecar undergoing a pitstop in the pouring rain at Monaco harbor. Mechanics in vintage drenched racing overalls changing wet tires, tire smoke blending with rain spray, harbor yachts in misty bokeh background, authentic 1970s grain, rich warm analog colors, shot on Leica M3 with 50mm Summicron --ar 16:9 --v 6.1 --style raw`,
+    negativePrompt: `modern digital look, 3d render, oversaturated, clean glossy cartoon, fake grain`,
+    settings: {
+      aspectRatio: '16:9',
+      recommendedModel: 'Midjourney v6.1',
+      guidanceScale: '4.5',
+      sampler: 'Euler'
+    }
+  },
+
+  // 16. Skeleton Tourbillon Watch Suspended in Liquid Gold Caustics (PREMIUM IMAGE)
+  {
+    id: 2001025,
+    numericId: 1025,
+    type: 'image',
+    title: 'Skeleton Tourbillon Watch Suspended in Liquid Gold Caustics',
+    slug: 'skeleton-tourbillon-watch-liquid-gold',
+    category: 'Commercial & Ads',
+    categoryId: 'commercial',
+    access: 'premium',
+    isTrending: true,
+    aspectRatio: '1:1',
+    model: 'Flux.1 Pro / Octane',
+    publishedLabel: 'Just now',
+    coverImage: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80',
+    tags: ['Luxury Watch', 'Product Photography', 'Commercial', 'Gold', 'Macro'],
+    description: 'Exquisite commercial product studio photography of a titanium skeleton tourbillon timepiece suspended over dark water with ripples and liquid gold caustics.',
+    promptText: `Luxury commercial product advertisement shot, an ultra-luxury open-worked skeleton tourbillon mechanical watch floating mid-air above dark reflective mineral water. Molten gold liquid splashes and caustic light patterns reflecting off polished bevelled sapphire crystal and ruby bearings, crystalline studio lighting, micro macro detail, 8k resolution, Hasselblad medium format commercial clarity --ar 1:1 --v 6.1 --style raw`,
+    negativePrompt: `cheap look, blurry, fingerprints, scratches, distorted numbers, low contrast`,
+    settings: {
+      aspectRatio: '1:1',
+      recommendedModel: 'Flux.1 Pro / Midjourney',
+      guidanceScale: '3.0',
+      sampler: 'DPM++ 2M'
+    }
+  },
+
+  // 17. Studio Ghibli Meadow Castle & Giant Twilight Clouds (FREE IMAGE)
+  {
+    id: 2001026,
+    numericId: 1026,
+    type: 'image',
+    title: 'Studio Ghibli Meadow Castle & Giant Twilight Clouds',
+    slug: 'ghibli-meadow-castle-twilight-clouds',
+    category: 'Anime & Stylized',
+    categoryId: 'anime',
+    access: 'free',
+    isTrending: true,
+    aspectRatio: '16:9',
+    model: 'Midjourney v6.1 (Niji 6)',
+    publishedLabel: 'Just now',
+    coverImage: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
+    tags: ['Anime', 'Ghibli', 'Miyazaki', 'Fantasy Castle', 'Meadow', 'Clouds'],
+    description: 'Enchanting Studio Ghibli style painterly anime landscape of a quaint stone clocktower castle in rolling wildflower hills under towering cumulus sunset clouds.',
+    promptText: `Hayao Miyazaki and Makoto Shinkai anime landscape masterpiece, an ancient stone clocktower castle nestled in vast rolling emerald green wildflower hills. Colossal fluffy cumulus clouds illuminated by pink and golden hour sunset light, a gentle breeze rustling fields of poppies, painterly gouache and watercolor texture, nostalgic emotional atmosphere, high aesthetic hand-drawn anime cel art --ar 16:9 --v 6.1 --style raw`,
+    negativePrompt: `3d render, CGI plastic, photorealistic photo, dark, gloomy, messy lines`,
+    settings: {
+      aspectRatio: '16:9',
+      recommendedModel: 'Midjourney v6.1 / Niji 6',
+      guidanceScale: '5.0',
+      sampler: 'Euler A'
+    }
+  },
+
+  // 18. Glowing Neural Network Synapse 3D Biocellular Macro (FREE IMAGE)
+  {
+    id: 2001027,
+    numericId: 1027,
+    type: 'image',
+    title: 'Glowing Neural Network Synapse 3D Biocellular Macro',
+    slug: 'glowing-neural-network-synapse-3d',
+    category: 'Science & 3D',
+    categoryId: 'science',
+    access: 'free',
+    isTrending: false,
+    aspectRatio: '1:1',
+    model: 'Midjourney v6.1',
+    publishedLabel: 'Just now',
+    coverImage: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?auto=format&fit=crop&w=800&q=80',
+    tags: ['Science', 'Brain', 'Neurons', '3D Medical', 'Macro', 'Bioluminescent'],
+    description: 'Ultra-high-definition 3D medical science visualization of human brain neurons firing electrical impulses across glowing blue and amber synaptic pathways.',
+    promptText: `Medical scientific 3D illustration, extreme electron microscope macro shot of interconnected human brain neurons and synapses. Luminescent electrical neurotransmitter signals sparking in electric cyan and amber across microscopic dendritic trees, translucent cell membranes with subsurface scattering, dark depth of field background, Octane render 5.0, photorealistic science journal cover --ar 1:1 --v 6.1 --style raw`,
+    negativePrompt: `cartoon, flat colors, low resolution, inaccurate anatomy, pixelated, noise`,
+    settings: {
+      aspectRatio: '1:1',
+      recommendedModel: 'Midjourney v6.1 / Octane',
+      guidanceScale: '4.2',
+      sampler: 'DPM++ SDE'
+    }
+  },
+
+  // 19. Golden Phoenix on Volcanic Obsidian Peak at Dawn (PREMIUM IMAGE)
+  {
+    id: 2001028,
+    numericId: 1028,
+    type: 'image',
+    title: 'Golden Phoenix on Volcanic Obsidian Peak at Dawn',
+    slug: 'golden-phoenix-volcanic-obsidian-peak',
+    category: 'Fantasy & Myth',
+    categoryId: 'fantasy',
+    access: 'premium',
+    isTrending: true,
+    aspectRatio: '4:5',
+    model: 'Flux.1 Pro / Midjourney',
+    publishedLabel: 'Just now',
+    coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+    tags: ['Phoenix', 'Fantasy', 'Mythology', 'Volcano', 'Fire', 'Feathers'],
+    description: 'Majestic mythological phoenix bird with luminous ember-tipped golden feathers perched atop a jagged black volcanic obsidian ridge overlooking glowing lava canyons.',
+    promptText: `Mythological dark fantasy photography, a magnificent immortal golden phoenix perched atop a sharp black volcanic glass obsidian mountain at sunrise. Intricate iridescent feathers glowing with embers and radiant heat trails, ruby red eyes, molten lava veins glowing in the deep foggy canyon below, cinematic volumetric sunrise rim light, shot on medium format 85mm lens, National Geographic fantasy edition --ar 4:5 --v 6.1 --style raw`,
+    negativePrompt: `chicken, deformed wings, cartoon drawing, low detail, blurry feathers, low contrast`,
+    settings: {
+      aspectRatio: '4:5',
+      recommendedModel: 'Flux.1 Pro / Midjourney v6.1',
+      guidanceScale: '3.8',
+      sampler: 'DPM++ 2M'
+    }
   }
 ];
 
@@ -781,10 +997,14 @@ export const INITIAL_PRICING_PLANS = [
 export const INITIAL_SITE_CONFIG = {
   brandName: 'Skillora AI',
   tagline: 'LEARN. EARN. GROW.',
+  ownerName: 'Adeel Murtaza',
   phone: '+92 316 1056008',
-  email: 'support@skillora.ai',
+  email: 'skilloraai87@gmail.com',
   supportHours: 'Mon - Sun: 24/7 Creator Support',
   whatsAppNumber: '923161056008',
+  whatsAppChannelUrl: 'https://whatsapp.com/channel/0029Vb3SkilloraAI',
+  facebookUrl: 'https://www.facebook.com/share/1Ed2AnopHN/',
+  instagramUrl: 'https://www.instagram.com/skilloraai1?vrfl=cDcyam42enlrMXN0',
   adminPin: '569646',
   heroSubtitle: 'WELCOME TO SKILLORA AI',
   heroTitle: 'QUALITY AI PROMPTS, BUILT FOR VIRAL CREATORS',
@@ -798,7 +1018,18 @@ export const PROMPTS = INITIAL_PROMPTS;
 export function loadStoredPrompts() {
   try {
     const raw = localStorage.getItem('skillora_prompts_db');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Auto-merge new prompts that are not yet in storage
+      const existingIds = new Set(parsed.map(p => p.id));
+      const missing = INITIAL_PROMPTS.filter(p => !existingIds.has(p.id));
+      if (missing.length > 0) {
+        const merged = [...parsed, ...missing];
+        saveStoredPrompts(merged);
+        return merged;
+      }
+      return parsed;
+    }
   } catch (e) {
     console.error('Failed to load prompts from storage', e);
   }
@@ -837,6 +1068,28 @@ export function loadStoredSiteConfig() {
     if (raw) {
       const parsed = JSON.parse(raw);
       let needsSave = false;
+      // Auto-update to latest email
+      if (!parsed.email || parsed.email.includes('support@skillora.ai')) {
+        parsed.email = 'skilloraai87@gmail.com';
+        needsSave = true;
+      }
+      // Auto-update socials
+      if (!parsed.facebookUrl || parsed.facebookUrl.includes('hamza')) {
+        parsed.facebookUrl = 'https://www.facebook.com/share/1Ed2AnopHN/';
+        needsSave = true;
+      }
+      if (!parsed.instagramUrl || parsed.instagramUrl.includes('hamzi')) {
+        parsed.instagramUrl = 'https://www.instagram.com/skilloraai1?vrfl=cDcyam42enlrMXN0';
+        needsSave = true;
+      }
+      if (!parsed.whatsAppChannelUrl) {
+        parsed.whatsAppChannelUrl = 'https://whatsapp.com/channel/0029Vb3SkilloraAI';
+        needsSave = true;
+      }
+      if (!parsed.ownerName) {
+        parsed.ownerName = 'Adeel Murtaza';
+        needsSave = true;
+      }
       // Auto-update to latest number
       if (!parsed.phone || parsed.phone.includes('312') || !parsed.whatsAppNumber || parsed.whatsAppNumber.includes('312')) {
         parsed.phone = '+92 316 1056008';

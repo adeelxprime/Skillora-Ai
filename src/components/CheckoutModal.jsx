@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Crown, Check, ShieldCheck, MessageCircle, ArrowRight, Zap } from 'lucide-react';
 
-export function CheckoutModal({ plan, onClose, onActivatePreviewPro }) {
+export function CheckoutModal({ plan, onClose, onActivatePreviewPro, siteConfig }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -9,12 +9,14 @@ export function CheckoutModal({ plan, onClose, onActivatePreviewPro }) {
 
   if (!plan) return null;
 
+  const whatsappNum = siteConfig?.whatsAppNumber || '923161056008';
+
   const handleWhatsAppCheckout = (e) => {
     e.preventDefault();
     const text = encodeURIComponent(
       `Hello Skillora AI Team! I want to activate the ${plan.name} (${plan.price} - ${plan.billing}). Name: ${name || 'Creator'}, Email: ${email || 'Not provided'}`
     );
-    window.open(`https://wa.me/923161056008?text=${text}`, '_blank');
+    window.open(`https://wa.me/${whatsappNum}?text=${text}`, '_blank');
   };
 
   return (

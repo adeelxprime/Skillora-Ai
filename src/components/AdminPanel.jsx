@@ -859,26 +859,108 @@ export function AdminPanel({
             <div className="bg-[#070e1f] border border-cyan-500/20 p-6 rounded-2xl space-y-4 shadow-xl">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Sliders className="w-5 h-5 text-cyan-400" />
-                Contact & Support Details
+                Website Ownership, Contact & Social Links
               </h3>
+              <p className="text-xs text-slate-400">
+                You have full control over all website details, customer support channels, and footer links.
+              </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1">Support Phone:</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Owner Name (Footer Copyright & Admin Portal):
+                  </label>
                   <input
                     type="text"
-                    value={siteConfig.phone}
+                    value={siteConfig.ownerName || 'Adeel Murtaza'}
+                    onChange={(e) => setSiteConfig({ ...siteConfig, ownerName: e.target.value })}
+                    className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                    placeholder="e.g. Adeel Murtaza"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Brand Name:
+                  </label>
+                  <input
+                    type="text"
+                    value={siteConfig.brandName || 'Skillora AI'}
+                    onChange={(e) => setSiteConfig({ ...siteConfig, brandName: e.target.value })}
+                    className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Customer Support Email:
+                  </label>
+                  <input
+                    type="email"
+                    value={siteConfig.email || 'skilloraai87@gmail.com'}
+                    onChange={(e) => setSiteConfig({ ...siteConfig, email: e.target.value })}
+                    className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                    placeholder="e.g. skilloraai87@gmail.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Support Phone Display:
+                  </label>
+                  <input
+                    type="text"
+                    value={siteConfig.phone || '+92 316 1056008'}
                     onChange={(e) => setSiteConfig({ ...siteConfig, phone: e.target.value })}
                     className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1">WhatsApp Number (e.g. 923161056008):</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    WhatsApp Support Number (without +, e.g. 923161056008):
+                  </label>
                   <input
                     type="text"
-                    value={siteConfig.whatsAppNumber}
+                    value={siteConfig.whatsAppNumber || '923161056008'}
                     onChange={(e) => setSiteConfig({ ...siteConfig, whatsAppNumber: e.target.value })}
+                    className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Official WhatsApp Channel Link:
+                  </label>
+                  <input
+                    type="url"
+                    value={siteConfig.whatsAppChannelUrl || 'https://whatsapp.com/channel/0029Vb3SkilloraAI'}
+                    onChange={(e) => setSiteConfig({ ...siteConfig, whatsAppChannelUrl: e.target.value })}
+                    className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                    placeholder="https://whatsapp.com/channel/..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Facebook Page Link:
+                  </label>
+                  <input
+                    type="url"
+                    value={siteConfig.facebookUrl || 'https://www.facebook.com/share/1Ed2AnopHN/'}
+                    onChange={(e) => setSiteConfig({ ...siteConfig, facebookUrl: e.target.value })}
+                    className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Instagram Profile Link:
+                  </label>
+                  <input
+                    type="url"
+                    value={siteConfig.instagramUrl || 'https://www.instagram.com/skilloraai1?vrfl=cDcyam42enlrMXN0'}
+                    onChange={(e) => setSiteConfig({ ...siteConfig, instagramUrl: e.target.value })}
                     className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
                   />
                 </div>
