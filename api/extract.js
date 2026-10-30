@@ -71,9 +71,9 @@ Aspect ratio: ${aspect}. Video context: ${videoName}.`
     }
 
     const candidateModels = [
-      'nvidia/nemotron-3.5-super-vl:free',
-      'liquid/lfm-2.5-2.6b:free',
-      'google/gemma-4-26b-a4b-it:free'
+      'openrouter/free',
+      'dots-studio/dots-3-note-preview:free',
+      'nvidia/nemotron-3.5-super-vl:free'
     ];
 
     let lastError = null;
@@ -81,8 +81,7 @@ Aspect ratio: ${aspect}. Video context: ${videoName}.`
 
     for (const model of candidateModels) {
       try {
-        // If model is text-only (like liquid), adjust content
-        const messagesContent = (model.includes('liquid') || !hasImage)
+        const messagesContent = (!hasImage)
           ? `Reverse engineer a master video prompt for scene: ${topic}. Aspect: ${aspect}. Video: ${videoName}. Lighting: ${lightingHint}. Return ONLY JSON.`
           : userContent;
 

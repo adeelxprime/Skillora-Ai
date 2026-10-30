@@ -527,10 +527,13 @@ export function PromptStudio() {
       return;
     }
 
-    // 1. Get real video frame image
-    let frameData = capturedKeyframe;
-    if ((!frameData || frameData.length < 500) && videoRef.current) {
+    // 1. Get real video frame image: prioritize fresh frame from current video playback
+    let frameData = null;
+    if (videoRef.current) {
       frameData = await captureFrameFromVideo();
+    }
+    if (!frameData || frameData.length < 500) {
+      frameData = capturedKeyframe;
     }
     if ((!frameData || frameData.length < 500) && uploadedVideoFile) {
       frameData = await extractFrameFromBlob(uploadedVideoFile);
@@ -602,10 +605,25 @@ export function PromptStudio() {
         }
       } else {
         const errData = await apiRes.json().catch(() => ({}));
-        console.warn('OpenRouter extraction response:', errData);
+        console.error('OpenRouter extraction failed:', errData);
+        if (errData.needKey || apiRes.status === 400) {
+          setShowKeyModal(true);
+          setKeyValidationState({
+            type: 'error',
+            message: 'OpenRouter API Key required. Please paste your sk-or-... key below to reverse-engineer prompts from your video.'
+          });
+          setIsAnalyzing(false);
+          return;
+        }
+        alert(`AI Video Analysis Error: ${errData.error || 'Server error occurred'}. Please ensure your OpenRouter API key is active.`);
+        setIsAnalyzing(false);
+        return;
       }
     } catch (e) {
-      console.warn('OpenRouter /api/extract skipped:', e);
+      console.error('OpenRouter /api/extract error:', e);
+      alert(`Connection Error: ${e.message}`);
+      setIsAnalyzing(false);
+      return;
     }
 
     // 3. Guaranteed dynamic scene synthesis from actual frame metrics
@@ -948,34 +966,65 @@ export function PromptStudio() {
 
                 {/* Captured Keyframe preview */}
                 {capturedKeyframe && (
-                  <div className="mt-3 p-2.5 rounded-xl bg-[#040814] border border-cyan-500/20 flex items-center gap-3">
-                    <img 
-                      src={capturedKeyframe} 
-                      alt="Captured Frame" 
-                      className="w-16 h-10 object-cover rounded-lg border border-cyan-400/30 shrink-0"
-                    />
-                    <div className="text-[11px]">
-                      <span className="text-slate-300 font-semibold block">Keyframe Captured & Scene Analyzed</span>
-                      <span className="text-cyan-400 text-[10px]">OpenRouter AI reverse-engineers prompt</span>
+                  <div className="mt-3 p-2.5 rounded-xl bg-[#040814] border border-cyan-500/30 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img 
+                        src={capturedKeyframe} 
+                        alt="Captured Frame" 
+                        className="w-16 h-10 object-cover rounded-lg border border-cyan-400/40 shrink-0 shadow-sm"
+                      />
+                      <div className="text-[11px] truncate">
+                        <span className="text-slate-200 font-semibold block truncate">Video Frame Captured</span>
+                        <span className="text-emerald-400 text-[10px] flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 inline" /> Ready for AI Prompt Extraction
+                        </span>
+                      </div>
                     </div>
+                    {videoRef.current && (
+                      <button
+                        type="button"
+                        onClick={() => captureFrameFromVideo()}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 font-mono px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-400/30 shrink-0 transition cursor-pointer"
+                        title="Update captured frame to current video timestamp"
+                      >
+                        Recapture
+                      </button>
+                    )}
                   </div>
                 )}
 
                 {/* OpenRouter AI Status & Key Management (Clean & 1-Click) */}
                 <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span className="text-xs font-semibold text-emerald-400">OpenRouter AI (Nemotron VL): Connected</span>
-                    <button 
-                      type="button"
-                      onClick={() => { setTempKeyInput(openrouterApiKey); setShowKeyModal(true); }}
-                      className="text-[11px] text-slate-400 hover:text-cyan-400 underline ml-1 cursor-pointer"
-                    >
-                      {openrouterApiKey ? 'Manage' : 'Custom Key'}
-                    </button>
+                    {openrouterApiKey ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span className="text-xs font-semibold text-emerald-400">OpenRouter AI: Active</span>
+                        <span className="text-[10px] font-mono text-slate-400">({openrouterApiKey.slice(0, 8)}••••)</span>
+                        <button 
+                          type="button"
+                          onClick={() => { setTempKeyInput(openrouterApiKey); setShowKeyModal(true); }}
+                          className="text-[11px] text-slate-400 hover:text-cyan-400 underline ml-1 cursor-pointer"
+                        >
+                          Change
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                        <span className="text-xs font-semibold text-amber-300">OpenRouter API Key:</span>
+                        <button 
+                          type="button"
+                          onClick={() => { setTempKeyInput(''); setShowKeyModal(true); }}
+                          className="text-[11px] font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 px-2.5 py-0.5 rounded-lg ml-1 cursor-pointer transition shadow-sm"
+                        >
+                          🔑 Connect Key
+                        </button>
+                      </>
+                    )}
                   </div>
                   <span className="text-[11px] text-slate-400 font-mono">
-                    Runway Gen-3 • Kling 1.5 • Luma • Sora
+                    Runway Gen-3 • Kling 1.5 • Sora
                   </span>
                 </div>
 
@@ -1351,7 +1400,7 @@ export function PromptStudio() {
               <div className="flex items-start gap-2">
                 <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center shrink-0 text-[11px]">2</span>
                 <p className="text-slate-300">
-                  Default server key is already connected. You can optionally paste a custom <code className="text-cyan-300 font-mono font-bold">sk-or-...</code> key below.
+                  Paste your <code className="text-cyan-300 font-mono font-bold">sk-or-...</code> key below. It is stored 100% privately in your browser's localStorage and is NEVER committed or exposed to GitHub.
                 </p>
               </div>
             </div>

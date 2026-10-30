@@ -14,12 +14,14 @@ export default defineConfig(({ mode }) => {
         name: 'prompt-extractor-backend-api',
         configureServer(server) {
           server.middlewares.use('/api/extract', async (req, res) => {
+            console.log(`[API /api/extract] ${req.method} request received`);
             if (req.method === 'POST') {
               const chunks = [];
               req.on('data', (chunk) => chunks.push(chunk));
               req.on('end', async () => {
                 try {
                   const body = JSON.parse(Buffer.concat(chunks).toString());
+                  console.log(`[API /api/extract] Body parsed. Topic: "${body.topic}", Has image: ${Boolean(body.image && body.image.length > 100)}, Image size: ${body.image?.length || 0} chars`);
 
                   // OpenRouter AI Provider (Primary Free & Pro Engine)
                   const apiKey = (
@@ -78,9 +80,9 @@ Aspect ratio: ${aspect}. Video context: ${videoName}.`
                   }
 
                   const candidateModels = [
-                    'nvidia/nemotron-3.5-super-vl:free',
-                    'liquid/lfm-2.5-2.6b:free',
-                    'google/gemma-4-26b-a4b-it:free'
+                    'openrouter/free',
+                    'dots-studio/dots-3-note-preview:free',
+                    'nvidia/nemotron-3.5-super-vl:free'
                   ];
 
                   let parsedResult = null;
@@ -88,7 +90,7 @@ Aspect ratio: ${aspect}. Video context: ${videoName}.`
 
                   for (const model of candidateModels) {
                     try {
-                      const messagesContent = (model.includes('liquid') || !hasImage)
+                      const messagesContent = (!hasImage)
                         ? `Reverse engineer a master video prompt for scene: ${topic}. Aspect: ${aspect}. Video: ${videoName}. Lighting: ${lightingHint}. Return ONLY JSON.`
                         : userContent;
 
