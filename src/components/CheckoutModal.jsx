@@ -70,7 +70,7 @@ export function CheckoutModal({ plan, onClose, onActivatePreviewPro, siteConfig 
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Adeel / Khizer"
+              placeholder="e.g. Khizer Khan"
               className="w-full bg-[#020d11] border border-[#143e49] p-3 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
             />
           </div>

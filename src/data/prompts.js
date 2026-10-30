@@ -968,36 +968,13 @@ export const INITIAL_PRICING_PLANS = [
     ],
     cta: 'Get Lifetime LMS Access',
     popular: false
-  },
-  {
-    id: 'custom',
-    name: 'CUSTOM BESPOKE BUILD',
-    badge: 'CUSTOM BUILD • ENTERPRISE',
-    subtitle: 'Engineered for your brand',
-    audience: 'For ambitious custom AI projects & agencies',
-    title: 'Custom AI Project System',
-    description: 'For clients who need a custom master prompt engineered around one specific content or production goal.',
-    originalPrice: '',
-    price: 'Custom Quote',
-    billing: 'Scoped around project',
-    saveText: '1-on-1 engineering & style lock guaranteed',
-    features: [
-      'Short-form or long-form master prompt system',
-      'AI-generated or realistic-video workflow',
-      'Custom niche logic, style locks and output format',
-      'Project discovery and requirement mapping',
-      'Delivery notes plus multiple refinement rounds',
-      'Dedicated prompt engineer assignment'
-    ],
-    cta: 'Request a Custom Quote',
-    popular: false
   }
 ];
 
 export const INITIAL_SITE_CONFIG = {
   brandName: 'Skillora AI',
   tagline: 'LEARN. EARN. GROW.',
-  ownerName: 'Adeel Murtaza',
+  ownerName: 'Khizer Khan',
   phone: '+92 316 1056008',
   email: 'skilloraai87@gmail.com',
   supportHours: 'Mon - Sun: 24/7 Creator Support',
@@ -1041,6 +1018,18 @@ export function saveStoredPrompts(prompts) {
     localStorage.setItem('skillora_prompts_db', JSON.stringify(prompts));
   } catch (e) {
     console.error('Failed to save prompts to storage', e);
+    // If quota exceeded due to large video base64, save safely by keeping coverImage and stripping oversized video data from localStorage
+    try {
+      const sanitized = prompts.map(p => {
+        if (p.videoUrl && p.videoUrl.length > 300000) {
+          return { ...p, videoUrl: '' };
+        }
+        return p;
+      });
+      localStorage.setItem('skillora_prompts_db', JSON.stringify(sanitized));
+    } catch (err2) {
+      console.warn('Fallback prompt save also failed:', err2);
+    }
   }
 }
 
@@ -1086,8 +1075,8 @@ export function loadStoredSiteConfig() {
         parsed.whatsAppChannelUrl = 'https://whatsapp.com/channel/0029Vb3SkilloraAI';
         needsSave = true;
       }
-      if (!parsed.ownerName) {
-        parsed.ownerName = 'Adeel Murtaza';
+      if (!parsed.ownerName || parsed.ownerName === 'Adeel Murtaza') {
+        parsed.ownerName = 'Khizer Khan';
         needsSave = true;
       }
       // Auto-update to latest number

@@ -261,6 +261,14 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-[#030712] text-slate-100 selection:bg-cyan-500 selection:text-black">
       
+      {/* Accessibility Skip to Content Link (100% WCAG 2.1 Compliant) */}
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-cyan-400 focus:text-slate-950 focus:font-bold focus:rounded-xl focus:shadow-xl"
+      >
+        Skip to main content
+      </a>
+
       {/* 1. Top Navigation Bar (Hidden Admin Panel: visitors only see public links) */}
       <Navbar
         activeTab={activeTab}
@@ -278,7 +286,7 @@ export default function App() {
       />
 
       {/* 2. Main Page Content */}
-      <main className="flex-1">
+      <main className="flex-1" id="main-content">
         
         {/* ADMIN HUB (Only visible when authenticated) */}
         {activeTab === 'admin' ? (

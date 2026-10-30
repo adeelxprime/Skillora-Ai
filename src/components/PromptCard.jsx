@@ -11,6 +11,7 @@ import {
   Layers, 
   Cpu, 
   Film,
+  Play,
   Image as ImageIcon
 } from 'lucide-react';
 
@@ -49,10 +50,20 @@ export function PromptCard({
           alt={prompt.title}
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 filter brightness-95 group-hover:brightness-105"
           loading="lazy"
+          decoding="async"
         />
 
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#081022] via-[#081022]/30 to-transparent"></div>
+
+        {/* Play Icon Indicator on hover for video prompts */}
+        {(prompt.videoUrl || prompt.type === 'video') && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+            <div className="w-12 h-12 rounded-full bg-cyan-400/90 text-slate-950 flex items-center justify-center shadow-lg shadow-cyan-500/50 backdrop-blur-sm transform group-hover:scale-110 transition duration-300">
+              <Play className="w-5 h-5 fill-current ml-0.5" />
+            </div>
+          </div>
+        )}
 
         {/* Top Badges */}
         <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10">

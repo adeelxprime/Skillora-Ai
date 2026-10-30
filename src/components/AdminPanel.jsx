@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   ShieldCheck, 
   Plus, 
@@ -22,7 +22,11 @@ import {
   Cloud,
   CheckCircle2,
   AlertTriangle,
-  Key
+  Key,
+  Upload,
+  Video,
+  FileVideo,
+  Play
 } from 'lucide-react';
 import { CATEGORIES } from '../data/prompts';
 import { 
@@ -33,6 +37,7 @@ import {
   upsertPricingToSupabase,
   upsertSiteConfigToSupabase 
 } from '../lib/supabase';
+import { storeMediaBlob, deleteMediaBlob } from '../lib/mediaStorage';
 
 export function AdminPanel({ 
   prompts, 
@@ -59,6 +64,171 @@ export function AdminPanel({
     setTimeout(() => setToastMessage(''), 3000);
   };
 
+  // Media file upload state & references
+  const mediaFileInputRef = useRef(null);
+  const [isProcessingMedia, setIsProcessingMedia] = useState(false);
+  const [mediaInputMode, setMediaInputMode] = useState('upload'); // 'upload' | 'url'
+
+  // Extract keyframe snapshot from a video file
+  const extractFrameFromVideoFile = (file) => {
+    return new Promise((resolve) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.muted = true;
+        v.playsInline = true;
+        v.src = url;
+
+        let hasResolved = false;
+        const doSnapshot = () => {
+          if (hasResolved) return;
+          hasResolved = true;
+          try {
+            const canvas = document.createElement('canvas');
+            let width = v.videoWidth || 640;
+            let height = v.videoHeight || 360;
+            const maxDim = 1024;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(v, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            URL.revokeObjectURL(url);
+            resolve({
+              dataUrl,
+              aspectRatio: v.videoHeight > v.videoWidth ? '9:16' : '16:9'
+            });
+          } catch (e) {
+            URL.revokeObjectURL(url);
+            resolve({ dataUrl: '', aspectRatio: '16:9' });
+          }
+        };
+
+        v.onloadedmetadata = () => {
+          v.currentTime = Math.min(1.0, (v.duration || 2) * 0.25);
+        };
+        v.onseeked = doSnapshot;
+        v.onerror = () => {
+          URL.revokeObjectURL(url);
+          resolve({ dataUrl: '', aspectRatio: '16:9' });
+        };
+        setTimeout(doSnapshot, 2500);
+      } catch (err) {
+        resolve({ dataUrl: '', aspectRatio: '16:9' });
+      }
+    });
+  };
+
+  // Optimize uploaded image via canvas
+  const optimizeImageFile = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width || 800;
+          let height = img.height || 600;
+          const maxDim = 1200;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          resolve({
+            dataUrl,
+            aspectRatio: height > width ? '4:5' : '16:9'
+          });
+        };
+        img.onerror = () => resolve({ dataUrl: e.target.result, aspectRatio: '4:5' });
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve({ dataUrl: '', aspectRatio: '4:5' });
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle direct file upload (Video or Image)
+  const handleMediaFileUpload = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    setIsProcessingMedia(true);
+
+    try {
+      if (file.type.startsWith('video/')) {
+        // Video file uploaded
+        const snapshot = await extractFrameFromVideoFile(file);
+
+        let videoDataUrl = '';
+        if (file.size <= 8 * 1024 * 1024) {
+          videoDataUrl = await new Promise((res) => {
+            const r = new FileReader();
+            r.onload = () => res(r.target.result);
+            r.onerror = () => res(URL.createObjectURL(file));
+            r.readAsDataURL(file);
+          });
+        } else {
+          videoDataUrl = URL.createObjectURL(file);
+        }
+
+        setEditingPrompt(prev => ({
+          ...prev,
+          type: 'video',
+          videoUrl: videoDataUrl,
+          coverImage: snapshot.dataUrl || prev.coverImage,
+          aspectRatio: snapshot.aspectRatio || prev.aspectRatio || '9:16',
+          mediaFileName: file.name
+        }));
+
+        showToast('🎬 Video uploaded & cover frame extracted!');
+      } else if (file.type.startsWith('image/')) {
+        // Image file uploaded
+        const optimized = await optimizeImageFile(file);
+
+        setEditingPrompt(prev => ({
+          ...prev,
+          type: 'image',
+          coverImage: optimized.dataUrl || prev.coverImage,
+          videoUrl: '',
+          aspectRatio: optimized.aspectRatio || prev.aspectRatio || '4:5',
+          mediaFileName: file.name
+        }));
+
+        showToast('🖼️ Image uploaded & optimized!');
+      } else {
+        alert('Please upload a valid image (JPG, PNG, WebP) or video (MP4, WebM, MOV) file.');
+      }
+    } catch (err) {
+      console.error('File upload error:', err);
+      showToast('Error processing media file.');
+    } finally {
+      setIsProcessingMedia(false);
+      if (mediaFileInputRef.current) {
+        mediaFileInputRef.current.value = '';
+      }
+    }
+  };
+
   // Filter prompts in table
   const tablePrompts = prompts.filter(p => {
     const matchesType = promptFilterType === 'all' || p.type === promptFilterType;
@@ -74,6 +244,7 @@ export function AdminPanel({
     if (window.confirm('Are you sure you want to delete this prompt?')) {
       const updated = prompts.filter(p => p.id !== id);
       setPrompts(updated);
+      deleteMediaBlob(id);
       if (isSupabaseConfigured) {
         await deletePromptFromSupabase(id);
       }
@@ -108,6 +279,10 @@ export function AdminPanel({
       showToast('Prompt updated successfully!');
     }
 
+    if (savedObj && savedObj.videoUrl) {
+      storeMediaBlob(savedObj.id, savedObj.videoUrl);
+    }
+
     if (isSupabaseConfigured && savedObj) {
       await upsertPromptToSupabase(savedObj);
     }
@@ -119,6 +294,7 @@ export function AdminPanel({
   // Start creating new
   const startCreateNew = (type = 'video') => {
     setIsCreatingNew(true);
+    setMediaInputMode('upload');
     setEditingPrompt({
       type: type,
       title: '',
@@ -128,6 +304,8 @@ export function AdminPanel({
       aspectRatio: type === 'video' ? '9:16' : '4:5',
       model: type === 'video' ? 'Kling 1.5 / Runway Gen-3' : 'Midjourney v6.1 / Flux.1',
       coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+      videoUrl: '',
+      mediaFileName: '',
       description: '',
       promptText: '',
       negativePrompt: 'blurry, low resolution, deformed, bad anatomy, ugly',
@@ -872,10 +1050,10 @@ export function AdminPanel({
                   </label>
                   <input
                     type="text"
-                    value={siteConfig.ownerName || 'Adeel Murtaza'}
+                    value={siteConfig.ownerName || 'Khizer Khan'}
                     onChange={(e) => setSiteConfig({ ...siteConfig, ownerName: e.target.value })}
                     className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
-                    placeholder="e.g. Adeel Murtaza"
+                    placeholder="e.g. Khizer Khan"
                   />
                 </div>
 
@@ -1113,6 +1291,157 @@ export function AdminPanel({
                 </div>
               </div>
 
+              {/* Media Upload Section (Video or Image File Upload) */}
+              <div className="p-4 rounded-2xl bg-[#040a1c] border border-cyan-500/30 space-y-3 shadow-inner">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-cyan-400" />
+                      Prompt Media (Video or Image)
+                    </span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                      editingPrompt.type === 'video'
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40'
+                        : 'bg-purple-500/20 text-purple-300 border border-purple-400/40'
+                    }`}>
+                      {editingPrompt.type === 'video' ? '🎬 Video Mode' : '🖼️ Image Mode'}
+                    </span>
+                  </div>
+
+                  {/* Mode switcher: Upload File vs Paste URL */}
+                  <div className="flex items-center gap-1 bg-[#020612] p-0.5 rounded-lg border border-slate-700 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setMediaInputMode('upload')}
+                      className={`px-2.5 py-1 rounded transition cursor-pointer ${
+                        mediaInputMode === 'upload' 
+                          ? 'bg-cyan-500/25 text-cyan-300 font-bold border border-cyan-500/40' 
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      📁 Upload File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMediaInputMode('url')}
+                      className={`px-2.5 py-1 rounded transition cursor-pointer ${
+                        mediaInputMode === 'url' 
+                          ? 'bg-cyan-500/25 text-cyan-300 font-bold border border-cyan-500/40' 
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      🔗 Paste URL
+                    </button>
+                  </div>
+                </div>
+
+                {mediaInputMode === 'upload' ? (
+                  <div>
+                    {/* Hidden Native File Input */}
+                    <input
+                      type="file"
+                      ref={mediaFileInputRef}
+                      accept="image/*,video/*"
+                      onChange={handleMediaFileUpload}
+                      className="hidden"
+                    />
+
+                    {isProcessingMedia ? (
+                      <div className="py-8 text-center bg-[#061026] border border-cyan-500/30 rounded-xl animate-pulse">
+                        <RefreshCw className="w-7 h-7 text-cyan-400 animate-spin mx-auto mb-2" />
+                        <span className="text-xs text-cyan-200 font-bold block">Processing Media File...</span>
+                        <span className="text-[11px] text-slate-400">Extracting cover frame & optimizing resolution</span>
+                      </div>
+                    ) : (
+                      <div 
+                        onClick={() => mediaFileInputRef.current?.click()}
+                        className="py-7 px-4 text-center rounded-xl border-2 border-dashed border-cyan-500/35 hover:border-cyan-400 bg-[#061026]/70 hover:bg-[#081533] transition cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-center gap-3 mb-2">
+                          <div className="p-2.5 rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 group-hover:scale-110 transition">
+                            <Film className="w-5 h-5" />
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-purple-500/15 border border-purple-400/30 text-purple-300 group-hover:scale-110 transition">
+                            <Image className="w-5 h-5" />
+                          </div>
+                        </div>
+                        <p className="text-xs font-black text-white group-hover:text-cyan-300 transition">
+                          Click to Browse & Upload Video or Image
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                          Upload any <span className="text-cyan-300">MP4, WebM, MOV</span> video or <span className="text-purple-300">PNG, JPG, WebP</span> image. Cover frame & aspect ratio will be extracted automatically!
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 mb-1">Cover Image URL:</label>
+                      <input
+                        type="url"
+                        value={editingPrompt.coverImage}
+                        onChange={(e) => setEditingPrompt({ ...editingPrompt, coverImage: e.target.value })}
+                        placeholder="https://images.unsplash.com/..."
+                        className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 mb-1">Video Stream URL (Optional):</label>
+                      <input
+                        type="url"
+                        value={editingPrompt.videoUrl || ''}
+                        onChange={(e) => setEditingPrompt({ ...editingPrompt, videoUrl: e.target.value })}
+                        placeholder="https://.../video.mp4"
+                        className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Media Preview Player / Image */}
+                {(editingPrompt.coverImage || editingPrompt.videoUrl) && (
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-3 bg-[#030714] p-3 rounded-xl border border-cyan-500/15">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {editingPrompt.videoUrl ? (
+                        <video 
+                          src={editingPrompt.videoUrl} 
+                          poster={editingPrompt.coverImage}
+                          controls
+                          className="w-24 h-16 object-cover rounded-lg border border-cyan-400/40 bg-black shrink-0 shadow-md" 
+                        />
+                      ) : (
+                        <img 
+                          src={editingPrompt.coverImage} 
+                          alt="Cover preview" 
+                          className="w-24 h-16 object-cover rounded-lg border border-cyan-400/40 shrink-0 shadow-md" 
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-white block truncate">
+                          {editingPrompt.mediaFileName || (editingPrompt.videoUrl ? 'Video Media Attached' : 'Image Attached')}
+                        </span>
+                        <span className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
+                          <CheckCircle2 className="w-3 h-3 inline shrink-0" />
+                          {editingPrompt.videoUrl ? 'Playable Video + Cover Frame Ready' : 'Cover Image Ready'}
+                        </span>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          Detected Ratio: <span className="text-cyan-300 font-mono font-bold">{editingPrompt.aspectRatio}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => mediaFileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/30 text-cyan-300 text-xs font-bold shrink-0 transition cursor-pointer"
+                    >
+                      Replace File
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-400 mb-1">Aspect Ratio:</label>
@@ -1126,26 +1455,15 @@ export function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1">Cover Image URL:</label>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Short Description / Excerpt:</label>
                   <input
-                    type="url"
-                    value={editingPrompt.coverImage}
-                    onChange={(e) => setEditingPrompt({ ...editingPrompt, coverImage: e.target.value })}
-                    placeholder="https://images.unsplash.com/..."
+                    type="text"
+                    value={editingPrompt.description}
+                    onChange={(e) => setEditingPrompt({ ...editingPrompt, description: e.target.value })}
+                    placeholder="Brief summary of what this prompt creates..."
                     className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">Short Description / Excerpt:</label>
-                <input
-                  type="text"
-                  value={editingPrompt.description}
-                  onChange={(e) => setEditingPrompt({ ...editingPrompt, description: e.target.value })}
-                  placeholder="Brief summary of what this prompt creates..."
-                  className="w-full bg-[#050a16] border border-slate-700 p-2.5 rounded-xl text-xs text-white"
-                />
               </div>
 
               <div>

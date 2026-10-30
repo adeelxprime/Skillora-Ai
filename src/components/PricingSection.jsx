@@ -54,8 +54,8 @@ export function PricingSection({ onSelectPlan, plans = PRICING_PLANS }) {
         </div>
       </div>
 
-      {/* Pricing Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+      {/* Pricing Cards Grid (3-Column Layout for Starter, Pro, LMS Masterclass) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch max-w-6xl mx-auto">
         {displayPlans.map((plan) => {
           const isSelected = plan.id === selectedPlanId;
           const isPro = plan.popular;

@@ -23,7 +23,7 @@ export function PolicyModal({ isOpen, onClose, initialTab = 'privacy', siteConfi
   const phoneDisplay = siteConfig?.phone || '+92 316 1056008';
   const whatsappNum = siteConfig?.whatsAppNumber || '923161056008';
   const emailSupport = siteConfig?.email || 'skilloraai87@gmail.com';
-  const ownerName = siteConfig?.ownerName || 'Adeel Murtaza';
+  const ownerName = siteConfig?.ownerName || 'Khizer Khan';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">

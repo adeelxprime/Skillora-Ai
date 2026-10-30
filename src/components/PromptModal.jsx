@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Copy, 
@@ -17,6 +17,7 @@ import {
   Video,
   Info
 } from 'lucide-react';
+import { getMediaBlob } from '../lib/mediaStorage';
 
 export function PromptModal({ 
   prompt, 
@@ -30,8 +31,21 @@ export function PromptModal({
   const [activeSceneIndex, setActiveSceneIndex] = useState(0);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [copiedNegative, setCopiedNegative] = useState(false);
+  const [localVideoUrl, setLocalVideoUrl] = useState(prompt?.videoUrl || '');
+
+  useEffect(() => {
+    if (!prompt) return;
+    setLocalVideoUrl(prompt.videoUrl || '');
+    if (!prompt.videoUrl && prompt.type === 'video') {
+      getMediaBlob(prompt.id).then((blobUrl) => {
+        if (blobUrl) setLocalVideoUrl(blobUrl);
+      });
+    }
+  }, [prompt]);
 
   if (!prompt) return null;
+
+  const videoSrc = localVideoUrl || prompt.videoUrl;
 
   const isLocked = prompt.access === 'premium' && !isProMember;
 
@@ -115,16 +129,30 @@ export function PromptModal({
           {/* Visual Showcase: Storyboards Carousel / Preview */}
           <div className="rounded-2xl overflow-hidden bg-[#030e12] border border-[#143d47]">
             <div className="relative aspect-video sm:aspect-[16/9] max-h-[380px] w-full bg-black flex items-center justify-center">
-              <img
-                src={
-                  prompt.storyboards && prompt.storyboards[activeSceneIndex]
-                    ? prompt.storyboards[activeSceneIndex].imageUrl
-                    : prompt.coverImage
-                }
-                alt={prompt.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none"></div>
+              {videoSrc ? (
+                <video
+                  src={videoSrc}
+                  poster={prompt.coverImage}
+                  controls
+                  playsInline
+                  className="w-full h-full object-contain bg-black"
+                />
+              ) : (
+                <img
+                  src={
+                    prompt.storyboards && prompt.storyboards[activeSceneIndex]
+                      ? prompt.storyboards[activeSceneIndex].imageUrl
+                      : prompt.coverImage
+                  }
+                  alt={prompt.title}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover"
+                />
+              )}
+              {!videoSrc && (
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none"></div>
+              )}
 
               {/* Scene Caption Overlay */}
               {prompt.storyboards && prompt.storyboards[activeSceneIndex] && (

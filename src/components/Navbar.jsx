@@ -84,14 +84,6 @@ export function Navbar({
         window.scrollTo({ top: 0, behavior: 'smooth' }); 
       } 
     },
-    { 
-      id: 'community', 
-      label: 'COMMUNITY', 
-      action: () => { 
-        setActiveTab('community'); 
-        window.scrollTo({ top: 0, behavior: 'smooth' }); 
-      } 
-    },
     ...(isAdminAuthenticated ? [{
       id: 'admin',
       label: 'ADMIN HUB',
@@ -122,6 +114,9 @@ export function Navbar({
               <img 
                 src="/assets/skillora-logo.png" 
                 alt="Skillora AI Logo" 
+                width="160"
+                height="48"
+                fetchPriority="high"
                 className="relative h-12 w-auto object-contain filter drop-shadow-[0_0_12px_rgba(56,189,248,0.4)]"
               />
             </div>
@@ -226,6 +221,7 @@ export function Navbar({
               {/* Mobile menu trigger */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
                 className="xl:hidden p-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 hover:text-white"
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}

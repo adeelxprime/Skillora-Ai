@@ -993,35 +993,21 @@ export function PromptStudio() {
                   </div>
                 )}
 
-                {/* OpenRouter AI Status & Key Management (Clean & 1-Click) */}
+                {/* OpenRouter AI Status & Key Management (Permanent Safe Integration) */}
                 <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
-                    {openrouterApiKey ? (
-                      <>
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span className="text-xs font-semibold text-emerald-400">OpenRouter AI: Active</span>
-                        <span className="text-[10px] font-mono text-slate-400">({openrouterApiKey.slice(0, 8)}••••)</span>
-                        <button 
-                          type="button"
-                          onClick={() => { setTempKeyInput(openrouterApiKey); setShowKeyModal(true); }}
-                          className="text-[11px] text-slate-400 hover:text-cyan-400 underline ml-1 cursor-pointer"
-                        >
-                          Change
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-                        <span className="text-xs font-semibold text-amber-300">OpenRouter API Key:</span>
-                        <button 
-                          type="button"
-                          onClick={() => { setTempKeyInput(''); setShowKeyModal(true); }}
-                          className="text-[11px] font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 px-2.5 py-0.5 rounded-lg ml-1 cursor-pointer transition shadow-sm"
-                        >
-                          🔑 Connect Key
-                        </button>
-                      </>
-                    )}
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span className="text-xs font-semibold text-emerald-400">OpenRouter AI Vision: Permanent Active</span>
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full">
+                      ✓ Ready
+                    </span>
+                    <button 
+                      type="button"
+                      onClick={() => { setTempKeyInput(openrouterApiKey); setShowKeyModal(true); }}
+                      className="text-[11px] text-slate-400 hover:text-cyan-400 underline ml-1 cursor-pointer"
+                    >
+                      {openrouterApiKey ? 'Custom Key Active' : 'Custom Key'}
+                    </button>
                   </div>
                   <span className="text-[11px] text-slate-400 font-mono">
                     Runway Gen-3 • Kling 1.5 • Sora
