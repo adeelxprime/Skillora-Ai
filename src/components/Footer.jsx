@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MessageCircle, Mail, Send, Sparkles, Heart, Radio, ShieldCheck } from 'lucide-react';
+import { MessageCircle, Mail } from 'lucide-react';
 import { PolicyModal } from './PolicyModal';
 
 export function Footer({ setActiveTab, onOpenPricing, onOpenAdminLogin, siteConfig }) {
@@ -11,16 +11,15 @@ export function Footer({ setActiveTab, onOpenPricing, onOpenAdminLogin, siteConf
   const ownerName = siteConfig?.ownerName || 'Adeel Murtaza';
   const facebookUrl = siteConfig?.facebookUrl || 'https://www.facebook.com/share/1Ed2AnopHN/';
   const instagramUrl = siteConfig?.instagramUrl || 'https://www.instagram.com/skilloraai1?vrfl=cDcyam42enlrMXN0';
-  const whatsAppChannelUrl = siteConfig?.whatsAppChannelUrl || 'https://whatsapp.com/channel/0029Vb3SkilloraAI';
 
   return (
     <>
       <footer className="bg-[#030712] border-t border-cyan-500/20 text-slate-400 text-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-8 mb-10">
             
             {/* Brand Info */}
-            <div className="md:col-span-2 space-y-4">
+            <div className="space-y-4 max-w-md">
               <div className="flex items-center gap-3">
                 <img 
                   src="/assets/skillora-logo.png" 
@@ -28,53 +27,12 @@ export function Footer({ setActiveTab, onOpenPricing, onOpenAdminLogin, siteConf
                   className="h-12 w-auto object-contain filter drop-shadow-[0_0_12px_rgba(56,189,248,0.4)]"
                 />
               </div>
-              <p className="text-sm text-slate-300 max-w-sm leading-relaxed">
+              <p className="text-sm text-slate-300 leading-relaxed">
                 Handcrafted AI video & image master prompts, storyboard references, and creator workflows engineered for viral content creators.
               </p>
               <div className="text-xs font-black tracking-widest brand-text-gradient uppercase">
                 LEARN • EARN • GROW
               </div>
-            </div>
-
-            {/* Quick Links */}
-            <div className="space-y-2.5">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">
-                Explore Platform
-              </h4>
-              <ul className="space-y-2">
-                <li>
-                  <button 
-                    onClick={() => setActiveTab('video-prompts')}
-                    className="hover:text-cyan-300 transition cursor-pointer"
-                  >
-                    AI Video Prompts (10+ Free & Pro)
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => setActiveTab('image-prompts')}
-                    className="hover:text-purple-300 transition cursor-pointer"
-                  >
-                    AI Image Prompts (10+ Free & Pro)
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => setActiveTab('generator')}
-                    className="hover:text-cyan-300 transition cursor-pointer"
-                  >
-                    AI Prompt Studio
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={onOpenPricing}
-                    className="hover:text-cyan-300 transition cursor-pointer"
-                  >
-                    Pricing & Membership Plans
-                  </button>
-                </li>
-              </ul>
             </div>
 
             {/* Social & Contact */}
@@ -95,18 +53,7 @@ export function Footer({ setActiveTab, onOpenPricing, onOpenAdminLogin, siteConf
                   <MessageCircle className="w-5 h-5" />
                 </a>
 
-                {/* 2. WhatsApp Channel */}
-                <a
-                  href={whatsAppChannelUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-2.5 rounded-xl bg-[#091226] hover:bg-[#0f1d3d] text-emerald-300 border border-cyan-500/20 hover:border-emerald-400/50 transition cursor-pointer flex items-center gap-1.5"
-                  title="Official WhatsApp Channel"
-                >
-                  <Radio className="w-5 h-5" />
-                </a>
-
-                {/* 3. Instagram */}
+                {/* 2. Instagram */}
                 <a
                   href={instagramUrl}
                   target="_blank"
@@ -119,7 +66,7 @@ export function Footer({ setActiveTab, onOpenPricing, onOpenAdminLogin, siteConf
                   </svg>
                 </a>
 
-                {/* 4. Facebook */}
+                {/* 3. Facebook */}
                 <a
                   href={facebookUrl}
                   target="_blank"
@@ -132,7 +79,7 @@ export function Footer({ setActiveTab, onOpenPricing, onOpenAdminLogin, siteConf
                   </svg>
                 </a>
 
-                {/* 5. Email Support Icon */}
+                {/* 4. Email Support Icon */}
                 <a
                   href={`mailto:${emailSupport}`}
                   className="p-2.5 rounded-xl bg-[#091226] hover:bg-[#0f1d3d] text-cyan-400 border border-cyan-500/20 hover:border-cyan-400/50 transition cursor-pointer"

@@ -5,7 +5,6 @@ import tailwindcss from '@tailwindcss/vite';
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const DEFAULT_GEMINI_KEY = env.VITE_GEMINI_API_KEY || '';
 
   return {
     plugins: [
@@ -21,132 +20,99 @@ export default defineConfig(({ mode }) => {
               req.on('end', async () => {
                 try {
                   const body = JSON.parse(Buffer.concat(chunks).toString());
-                  const provider = body.provider || 'gemini';
 
-                  // 1. DeepSeek API Provider
-                  if (provider === 'deepseek') {
-                    const deepseekKey = (req.headers['x-deepseek-key'] || env.VITE_DEEPSEEK_API_KEY || process.env.VITE_DEEPSEEK_API_KEY || '').trim();
-                    if (!deepseekKey) {
-                      res.writeHead(400, { 'Content-Type': 'application/json' });
-                      res.end(JSON.stringify({ error: 'DeepSeek API key (sk-...) is required' }));
-                      return;
-                    }
+                  // OpenRouter AI Provider (Primary Free & Pro Engine)
+                  const apiKey = (
+                    req.headers['x-openrouter-key'] || 
+                    body.apiKey || 
+                    env.OPENROUTER_API_KEY || 
+                    env.VITE_OPENROUTER_API_KEY || 
+                    process.env.OPENROUTER_API_KEY || 
+                    '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'
+                  ).trim();
 
-                    const dsResponse = await fetch('https://api.deepseek.com/chat/completions', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${deepseekKey}`
-                      },
-                      body: JSON.stringify({
-                        model: 'deepseek-chat',
-                        messages: [
-                          {
-                            role: 'system',
-                            content: 'You are an elite AI prompt engineer. Reverse-engineer video and image scenes into ultra-realistic master AI prompts. Return ONLY a valid JSON object matching the schema with keys: subject, camera, lighting, masterPrompt, negative.'
-                          },
-                          {
-                            role: 'user',
-                            content: `Reverse-engineer a master prompt for this scene: ${body.topic || 'high-end cinematic visual'}. Aspect ratio: ${body.aspect || '16:9'}.
+                  if (!apiKey) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ needKey: true, error: 'OpenRouter API key is required' }));
+                    return;
+                  }
+
+                  const topic = body.topic || 'high-end cinematic visual';
+                  const aspect = body.aspect || '16:9';
+                  const videoName = body.videoName || 'scene';
+                  const lightingHint = body.lightingHint || 'Cinematic volumetric lighting';
+
+                  const systemPrompt = `You are an elite Hollywood & AI prompt engineer specializing in cinematic master prompts for Sora, Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, and Midjourney v6.1. Reverse-engineer the given video scene into an ultra-realistic, director-level prompt. Return ONLY a valid JSON object (no markdown, no backticks, no other text) with keys: subject, camera, lighting, masterPrompt, negative.`;
+
+                  const userPrompt = `Reverse-engineer a master prompt for this scene:
+- Topic / Focus: ${topic}
+- Video Name: ${videoName}
+- Aspect Ratio: ${aspect}
+- Lighting Profile: ${lightingHint}
+
 Return JSON:
 {
   "subject": "Detailed description of subject, action and clothing",
-  "camera": "Camera shot, movement, angle and lens",
+  "camera": "Camera shot, movement, angle and lens physics",
   "lighting": "Volumetric lighting, contrast and atmospheric glow",
-  "masterPrompt": "The complete rich master prompt ready for Kling 1.5 or Runway Gen-3 with 4K 60fps --ar ${body.aspect || '16:9'} --v 6.1 --style raw",
-  "negative": "blurry, low quality, deformed, extra limbs, artifacts, cartoon look"
-}`
-                          }
-                        ]
-                      })
-                    });
+  "masterPrompt": "The complete rich master prompt ready for Kling 1.5 or Runway Gen-3 with 4K 60fps --ar ${aspect} --v 6.1 --style raw",
+  "negative": "blurry, low quality, deformed, extra limbs, artifacts, cartoon look, low resolution"
+}`;
 
-                    const dsData = await dsResponse.json();
-                    if (!dsResponse.ok) {
-                      res.writeHead(dsResponse.status, { 'Content-Type': 'application/json' });
-                      res.end(JSON.stringify({ error: dsData.error?.message || 'DeepSeek API error' }));
-                      return;
-                    }
-
-                    let rawText = dsData.choices?.[0]?.message?.content || '';
-                    rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
-                    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) rawText = jsonMatch[0];
-                    const parsed = JSON.parse(rawText);
-
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(parsed));
-                    return;
-                  }
-
-                  // 2. Google Gemini Vision Provider (Default & Server-Managed)
-                  const key = (req.headers['x-gemini-key'] || DEFAULT_GEMINI_KEY).trim();
-                  const imageData = (body.image || '').replace(/^data:image\/\w+;base64,/, '');
-
-                  const parts = [
-                    {
-                      text: `You are an elite AI prompt engineer and extractor for video generators like Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, Sora, and Midjourney v6.1.
-Look at this video scene carefully. Describe what is in this scene precisely and reverse-engineer the exact master AI video prompt to recreate it.
-Be extremely detailed about the subject, clothing, environment, lighting, and camera movement.
-
-Return ONLY a valid JSON object matching this schema (no markdown, no other text):
-{
-  "subject": "Detailed description of the subject, clothing, action and setting in this image",
-  "camera": "Camera shot, movement (e.g. low-angle tracking shot, 35mm lens dolly in, orbital pan) and lens angle",
-  "lighting": "Atmospheric lighting, contrast, god rays, neon reflections and color grade",
-  "masterPrompt": "The complete, rich master prompt ready to generate this exact scene in Kling AI or Runway Gen-3, with 4K 60fps --ar ${body.aspect || '16:9'} --v 6.1 --style raw",
-  "negative": "blurry, low quality, deformed, extra limbs, bad face, artifacts, cartoon look"
-}`
-                    }
+                  const candidateModels = [
+                    'nvidia/nemotron-3.5-super-vl:free',
+                    'liquid/lfm-2.5-2.6b:free',
+                    'google/gemma-4-26b-a4b-it:free'
                   ];
 
-                  if (imageData) {
-                    parts.push({
-                      inline_data: {
-                        mime_type: 'image/jpeg',
-                        data: imageData
+                  let parsedResult = null;
+                  let lastError = null;
+
+                  for (const model of candidateModels) {
+                    try {
+                      const orResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${apiKey}`,
+                          'HTTP-Referer': 'http://localhost:3000',
+                          'X-Title': 'Skillora AI Video Prompt Extractor'
+                        },
+                        body: JSON.stringify({
+                          model,
+                          temperature: 0.6,
+                          messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: userPrompt }
+                          ]
+                        })
+                      });
+
+                      const orData = await orResponse.json();
+                      if (orResponse.ok && orData.choices?.[0]?.message?.content) {
+                        let rawText = orData.choices[0].message.content;
+                        rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+                        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) rawText = jsonMatch[0];
+                        parsedResult = JSON.parse(rawText);
+                        parsedResult.modelUsed = model;
+                        break;
+                      } else {
+                        lastError = orData.error?.message || `Model ${model} failed`;
                       }
-                    });
-                  }
-
-                  if (!key) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Gemini API key is required' }));
-                    return;
-                  }
-
-                  const response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`,
-                    {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json'
-                      },
-                      body: JSON.stringify({
-                        contents: [
-                          {
-                            parts
-                          }
-                        ]
-                      })
+                    } catch (err) {
+                      lastError = err.message;
                     }
-                  );
+                  }
 
-                  const data = await response.json();
-                  if (!response.ok) {
-                    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: data.error?.message || 'Gemini Vision API error' }));
+                  if (parsedResult) {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(parsedResult));
                     return;
                   }
 
-                  let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                  rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
-                  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-                  if (jsonMatch) rawText = jsonMatch[0];
-                  const parsed = JSON.parse(rawText);
-
-                  res.writeHead(200, { 'Content-Type': 'application/json' });
-                  res.end(JSON.stringify(parsed));
+                  res.writeHead(500, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ error: lastError || 'OpenRouter extraction failed' }));
                 } catch (err) {
                   console.error('API Extract Error:', err);
                   res.writeHead(500, { 'Content-Type': 'application/json' });

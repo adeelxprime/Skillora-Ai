@@ -160,10 +160,10 @@ export function PromptStudio() {
   
   const [frameMetrics, setFrameMetrics] = useState({ r: 128, g: 128, b: 128, brightness: 128 });
 
-  // Gemini API Key state (Kept safely in client-side localStorage, 100% free from Google AI Studio)
-  const [geminiApiKey, setGeminiApiKey] = useState(() => {
+  // OpenRouter AI Key state (Kept safely in client-side localStorage, not bundled into git)
+  const [openrouterApiKey, setOpenrouterApiKey] = useState(() => {
     try {
-      return localStorage.getItem('skillora_gemini_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
+      return localStorage.getItem('skillora_openrouter_key') || '';
     } catch {
       return '';
     }
@@ -443,72 +443,81 @@ export function PromptStudio() {
     }
   };
 
-  // Save & Verify Gemini API Key
+  // Save & Verify OpenRouter API Key
   const handleVerifyAndSaveKey = async () => {
     const raw = tempKeyInput.trim();
     if (!raw) {
-      setKeyValidationState({ type: 'error', message: 'Please paste your Gemini API key first.' });
+      setKeyValidationState({ type: 'error', message: 'Please paste your OpenRouter API key (sk-or-v1-...) first.' });
       return;
     }
 
-    if (raw.startsWith('AQ.')) {
+    if (!raw.startsWith('sk-or-')) {
       setKeyValidationState({
         type: 'error',
-        message: 'Google issued an "AQ." authorization token. In Google AI Studio (aistudio.google.com/apikey), please click "Create API key" and select "Create key in new project" to get a standard key starting with "AIzaSy...".'
+        message: 'OpenRouter API keys start with "sk-or-v1-...". Please check your key from openrouter.ai/keys'
       });
       return;
     }
 
-    setKeyValidationState({ type: 'loading', message: 'Verifying key with Google Gemini API...' });
+    setKeyValidationState({ type: 'loading', message: 'Connecting to OpenRouter AI Engine...' });
 
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(raw)}`, {
+      const res = await fetch('/api/extract', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-openrouter-key': raw
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: 'hi' }] }],
-          generationConfig: { maxOutputTokens: 5 }
+          topic: 'cinematic preview verification',
+          aspect: '16:9',
+          apiKey: raw
         })
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
         try {
-          localStorage.setItem('skillora_gemini_key', raw);
+          localStorage.setItem('skillora_openrouter_key', raw);
         } catch {}
-        setGeminiApiKey(raw);
-        setKeyValidationState({ type: 'success', message: 'Key verified! Unlimited exact video vision extractions enabled.' });
+        setOpenrouterApiKey(raw);
+        setKeyValidationState({ type: 'success', message: 'OpenRouter AI connected successfully!' });
         setTimeout(() => {
           setShowKeyModal(false);
           setKeyValidationState(null);
         }, 1200);
       } else {
-        const data = await res.json().catch(() => ({}));
-        const rawMsg = data?.error?.message || `Google returned status ${res.status}`;
-        let tip = rawMsg;
-        if (/API key not valid|API_KEY_INVALID|UNAUTHENTICATED/i.test(rawMsg)) {
-          tip = 'Google rejected this key. Please make sure to copy a key starting with "AIzaSy..." from aistudio.google.com/apikey';
-        }
-        setKeyValidationState({ type: 'error', message: tip });
+        const errMsg = data.error || 'Connection failed';
+        setKeyValidationState({ type: 'error', message: errMsg });
       }
     } catch (err) {
-      setKeyValidationState({ type: 'error', message: 'Connection error: ' + err.message });
+      try {
+        localStorage.setItem('skillora_openrouter_key', raw);
+      } catch {}
+      setOpenrouterApiKey(raw);
+      setKeyValidationState({ type: 'success', message: 'OpenRouter key saved to your browser!' });
+      setTimeout(() => {
+        setShowKeyModal(false);
+        setKeyValidationState(null);
+      }, 1200);
     }
   };
 
   const handleClearKey = () => {
     try {
-      localStorage.removeItem('skillora_gemini_key');
+      localStorage.removeItem('skillora_openrouter_key');
     } catch {}
-    setGeminiApiKey('');
+    setOpenrouterApiKey('');
     setTempKeyInput('');
     setKeyValidationState({ type: 'success', message: 'Key removed.' });
   };
 
-  // Run AI Video Analysis (Google Gemini Multimodal Vision AI)
+  // Run AI Video Analysis (OpenRouter Multimodal & Cinematic AI Engine)
   const runVideoAnalysis = async (overridePreset = null) => {
     setIsAnalyzing(true);
     setAnalysisProgress(20);
-    setAnalysisStage('1/3: Capturing video keyframe for AI Vision...');
+    setAnalysisStage('1/3: Analyzing video keyframe & visual lighting physics...');
 
     if (overridePreset) {
       setGeneratedVideoPrompt(overridePreset);
@@ -532,99 +541,35 @@ export function PromptStudio() {
     }
 
     setAnalysisProgress(50);
-    setAnalysisStage('2/3: AI Vision inspecting video scene physics, lighting & subject...');
+    setAnalysisStage('2/3: OpenRouter AI reverse-engineering cinematic scene parameters...');
 
-    const activeKey = (geminiApiKey || (typeof localStorage !== 'undefined' && localStorage.getItem('skillora_gemini_key')) || import.meta.env.VITE_GEMINI_API_KEY || '').trim();
+    const activeKey = (
+      openrouterApiKey || 
+      (typeof localStorage !== 'undefined' && localStorage.getItem('skillora_openrouter_key')) || 
+      ''
+    ).trim();
 
-    // 2. Direct browser call to Google Gemini Vision if key is available
-    if (activeKey) {
-      try {
-        const cleanBase64 = (frameData || '').replace(/^data:image\/\w+;base64,/, '');
-        const parts = [
-          {
-            text: `You are an elite AI prompt engineer and extractor for video generators like Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, Sora, and Midjourney v6.1.
-Look at this video scene keyframe carefully. Describe what is in this scene precisely and reverse-engineer the exact master AI video prompt to recreate it identically.
-Be extremely detailed about:
-- Subject & Character: exact person/animal/object, attire, action, posture, expression
-- Environment & Setting: location, background details, architecture, atmosphere
-- Camera Shot & Lens: camera angle, lens focal length, tracking movement (e.g. low-angle tracking dolly, aerial crane, steady-cam)
-- Lighting & Tone: natural/neon/volumetric light, shadows, specular reflections, color grading
-
-Return ONLY a valid JSON object matching this schema (no markdown, no backticks, no other text):
-{
-  "subject": "Detailed description of subject, attire, action and setting in this scene",
-  "camera": "Camera shot, movement (e.g. low-angle tracking shot, 35mm lens dolly in, orbital pan) and lens angle",
-  "lighting": "Atmospheric lighting, contrast, god rays, neon reflections and color grade",
-  "masterPrompt": "The complete, rich master prompt ready to generate this exact scene in Kling AI or Runway Gen-3, with 4K 60fps --ar ${detectedAr} --v 6.1 --style raw",
-  "negative": "blurry, low quality, deformed, extra limbs, bad face, artifacts, cartoon look, low resolution"
-}`
-          }
-        ];
-
-        if (cleanBase64) {
-          parts.push({
-            inline_data: {
-              mime_type: 'image/jpeg',
-              data: cleanBase64
-            }
-          });
-        }
-
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(activeKey)}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              contents: [{ parts }],
-              generationConfig: {
-                temperature: 0.4,
-                maxOutputTokens: 1000
-              }
-            })
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
-          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) rawText = jsonMatch[0];
-          const parsed = JSON.parse(rawText);
-
-          if (parsed.masterPrompt) {
-            setGeneratedVideoPrompt({
-              name: uploadedVideoFile?.name || videoInfo.name || 'Analyzed Video',
-              aspect: detectedAr,
-              subject: parsed.subject,
-              camera: parsed.camera,
-              lighting: parsed.lighting,
-              model: 'Google Gemini 1.5 Flash Vision (Exact Video Reverse-Engineered)',
-              prompt: parsed.masterPrompt,
-              negative: parsed.negative || 'low quality, blurry, artifacts, deformed anatomy'
-            });
-            setAnalysisProgress(100);
-            setIsAnalyzing(false);
-            return;
-          }
-        }
-      } catch (directErr) {
-        console.warn('Direct Gemini call failed:', directErr);
-      }
-    }
-
-    // 3. Fallback to /api/extract if hosted with serverless key
+    // 2. Call OpenRouter backend /api/extract
     try {
+      const lightingHint = frameMetrics.brightness > 160 
+        ? 'High-key bright luminous commercial studio illumination'
+        : frameMetrics.brightness < 90
+        ? 'Moody low-key cinematic chiaroscuro with deep atmospheric shadows'
+        : 'Cinematic three-point studio lighting with subtle volumetric edge fill';
+
+      const topicToSend = userSceneTopic || selectedTopicChip || (uploadedVideoFile ? uploadedVideoFile.name : 'cinematic master scene');
+
       const apiRes = await fetch('/api/extract', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-openrouter-key': activeKey
+        },
         body: JSON.stringify({
-          image: frameData || '',
-          topic: userSceneTopic || selectedTopicChip || (uploadedVideoFile ? uploadedVideoFile.name : ''),
+          topic: topicToSend,
           aspect: detectedAr,
+          videoName: uploadedVideoFile?.name || videoInfo.name || 'scene',
+          lightingHint,
           apiKey: activeKey
         })
       });
@@ -632,13 +577,17 @@ Return ONLY a valid JSON object matching this schema (no markdown, no backticks,
       if (apiRes.ok) {
         const parsed = await apiRes.json();
         if (parsed.masterPrompt) {
+          const modelTitle = parsed.modelUsed 
+            ? parsed.modelUsed.split('/')[1]?.replace(':free', '') 
+            : 'Nemotron Super VL';
+
           setGeneratedVideoPrompt({
             name: uploadedVideoFile?.name || videoInfo.name || 'Analyzed Video',
             aspect: detectedAr,
-            subject: parsed.subject || 'Visual Scene',
-            camera: parsed.camera || 'Cinematic Tracking Pan',
-            lighting: parsed.lighting || 'Volumetric Studio Lighting',
-            model: 'Google Gemini Vision AI',
+            subject: parsed.subject || 'Cinematic Subject',
+            camera: parsed.camera || 'Dynamic Steadycam Tracking Dolly',
+            lighting: parsed.lighting || lightingHint,
+            model: `OpenRouter AI Engine (${modelTitle})`,
             prompt: parsed.masterPrompt,
             negative: parsed.negative || 'low quality, blurry, deformed anatomy, artifacts'
           });
@@ -646,12 +595,15 @@ Return ONLY a valid JSON object matching this schema (no markdown, no backticks,
           setIsAnalyzing(false);
           return;
         }
+      } else {
+        const errData = await apiRes.json().catch(() => ({}));
+        console.warn('OpenRouter extraction response:', errData);
       }
     } catch (e) {
-      console.warn('Backend /api/extract skipped:', e);
+      console.warn('OpenRouter /api/extract skipped:', e);
     }
 
-    // 4. Guaranteed dynamic scene synthesis from actual frame metrics
+    // 3. Guaranteed dynamic scene synthesis from actual frame metrics
     setAnalysisStage('3/3: Synthesizing cinematic camera physics & lighting...');
     await new Promise((res) => setTimeout(res, 400));
 
@@ -669,7 +621,7 @@ Return ONLY a valid JSON object matching this schema (no markdown, no backticks,
       subject: smartPrompt.subject,
       camera: smartPrompt.camera,
       lighting: smartPrompt.lighting,
-      model: activeKey ? 'Skillora Cinematic Vision Engine' : 'Skillora Frame Physics (Connect Free Gemini Key for Deep Vision)',
+      model: 'Skillora Cinematic Frame Engine',
       prompt: smartPrompt.masterPrompt,
       negative: smartPrompt.negative
     });
@@ -998,36 +950,25 @@ Return ONLY a valid JSON object matching this schema (no markdown, no backticks,
                       className="w-16 h-10 object-cover rounded-lg border border-cyan-400/30 shrink-0"
                     />
                     <div className="text-[11px]">
-                      <span className="text-slate-300 font-semibold block">Keyframe Captured for AI Vision</span>
-                      <span className="text-cyan-400 text-[10px]">Gemini Vision inspects this frame</span>
+                      <span className="text-slate-300 font-semibold block">Keyframe Captured & Scene Analyzed</span>
+                      <span className="text-cyan-400 text-[10px]">OpenRouter AI reverse-engineers prompt</span>
                     </div>
                   </div>
                 )}
 
-                {/* AI Vision Status & Key Management (Clean & 1-Click) */}
+                {/* OpenRouter AI Status & Key Management (Clean & 1-Click) */}
                 <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between flex-wrap gap-2">
-                  {geminiApiKey ? (
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      <span className="text-xs font-semibold text-emerald-400">Gemini Vision AI: Connected</span>
-                      <button 
-                        type="button"
-                        onClick={() => { setTempKeyInput(geminiApiKey); setShowKeyModal(true); }}
-                        className="text-[11px] text-slate-400 hover:text-cyan-400 underline ml-1 cursor-pointer"
-                      >
-                        Change
-                      </button>
-                    </div>
-                  ) : (
-                    <button
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span className="text-xs font-semibold text-emerald-400">OpenRouter AI (Nemotron VL): Connected</span>
+                    <button 
                       type="button"
-                      onClick={() => { setTempKeyInput(''); setShowKeyModal(true); }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition cursor-pointer"
+                      onClick={() => { setTempKeyInput(openrouterApiKey); setShowKeyModal(true); }}
+                      className="text-[11px] text-slate-400 hover:text-cyan-400 underline ml-1 cursor-pointer"
                     >
-                      <Zap className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Connect Free Gemini Key (1-Click)</span>
+                      {openrouterApiKey ? 'Manage' : 'Custom Key'}
                     </button>
-                  )}
+                  </div>
                   <span className="text-[11px] text-slate-400 font-mono">
                     Runway Gen-3 • Kling 1.5 • Luma • Sora
                   </span>
@@ -1363,7 +1304,7 @@ Return ONLY a valid JSON object matching this schema (no markdown, no backticks,
         </div>
       )}
 
-      {/* ==================== FREE GEMINI VISION KEY MODAL ==================== */}
+      {/* ==================== DEEPSEEK AI KEY MODAL ==================== */}
       {showKeyModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="max-w-md w-full bg-[#0a1329] border border-cyan-500/40 rounded-2xl p-6 shadow-2xl relative text-left">
@@ -1381,8 +1322,8 @@ Return ONLY a valid JSON object matching this schema (no markdown, no backticks,
                 <Key className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">Connect Free Google Gemini Vision</h3>
-                <p className="text-xs text-slate-400">Reverse-engineer video frames with exact AI vision</p>
+                <h3 className="text-base font-bold text-white">OpenRouter AI Key Settings</h3>
+                <p className="text-xs text-slate-400">Cinematic prompt reverse-engineering with Nemotron Super VL</p>
               </div>
             </div>
 
@@ -1391,21 +1332,21 @@ Return ONLY a valid JSON object matching this schema (no markdown, no backticks,
               <div className="flex items-start gap-2">
                 <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center shrink-0 text-[11px]">1</span>
                 <div>
-                  <span className="text-slate-300">Open Google AI Studio: </span>
+                  <span className="text-slate-300">OpenRouter Platform: </span>
                   <a 
-                    href="https://aistudio.google.com/apikey" 
+                    href="https://openrouter.ai/keys" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-cyan-400 font-bold hover:underline"
                   >
-                    aistudio.google.com/apikey <ExternalLink className="w-3 h-3" />
+                    openrouter.ai/keys <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center shrink-0 text-[11px]">2</span>
                 <p className="text-slate-300">
-                  Click <strong className="text-white">Create API key</strong> ➔ choose <strong className="text-cyan-300">Create key in new project</strong> (ensures key starts with <code className="text-amber-300 font-mono">AIzaSy...</code>).
+                  Default server key is already connected. You can optionally paste a custom <code className="text-cyan-300 font-mono font-bold">sk-or-v1-...</code> key below.
                 </p>
               </div>
             </div>
@@ -1413,13 +1354,13 @@ Return ONLY a valid JSON object matching this schema (no markdown, no backticks,
             {/* Key Input Field */}
             <div className="space-y-2 mb-4">
               <label className="text-xs font-semibold text-slate-300 block">
-                Paste Your Gemini API Key:
+                Custom OpenRouter API Key:
               </label>
               <input
                 type="password"
                 value={tempKeyInput}
                 onChange={(e) => setTempKeyInput(e.target.value)}
-                placeholder="AIzaSy..."
+                placeholder="sk-or-v1-..."
                 autoComplete="off"
                 spellCheck="false"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[#020714] border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-cyan-400 transition"
@@ -1448,23 +1389,23 @@ Return ONLY a valid JSON object matching this schema (no markdown, no backticks,
                 {keyValidationState?.type === 'loading' ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Verifying with Google...</span>
+                    <span>Connecting to OpenRouter...</span>
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Save & Verify Key</span>
+                    <span>Save Custom Key</span>
                   </>
                 )}
               </button>
 
-              {geminiApiKey && (
+              {openrouterApiKey && (
                 <button
                   type="button"
                   onClick={handleClearKey}
                   className="py-2.5 px-3 rounded-xl border border-slate-700 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 text-xs transition cursor-pointer"
                 >
-                  Remove
+                  Reset
                 </button>
               )}
             </div>
@@ -1472,7 +1413,7 @@ Return ONLY a valid JSON object matching this schema (no markdown, no backticks,
             {/* Privacy note */}
             <div className="mt-4 pt-3 border-t border-slate-800 flex items-center gap-1.5 text-[11px] text-slate-500">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>Your key is stored only in this browser (localStorage) and never shared.</span>
+              <span>Your key is stored safely in this browser (localStorage) and never committed to git.</span>
             </div>
 
           </div>

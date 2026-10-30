@@ -2,7 +2,7 @@ export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Gemini-Key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-OpenRouter-Key, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -14,75 +14,97 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const image = body?.image;
-    const userApiKey = (req.headers['x-gemini-key'] || body?.apiKey || process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '').trim();
+    const apiKey = (
+      req.headers['x-openrouter-key'] ||
+      req.headers['authorization']?.replace('Bearer ', '') ||
+      body?.apiKey ||
+      process.env.OPENROUTER_API_KEY ||
+      process.env.VITE_OPENROUTER_API_KEY ||
+      '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'
+    ).trim();
 
-    if (!userApiKey) {
+    if (!apiKey) {
       return res.status(400).json({ 
         needKey: true,
-        error: 'Google Gemini API key required. Please provide a valid Gemini key starting with AIzaSy...' 
+        error: 'OpenRouter API key required. Please connect your OpenRouter key.' 
       });
     }
 
-    const cleanBase64 = (image || '').replace(/^data:image\/\w+;base64,/, '');
+    const topic = body?.topic || 'cinematic video sequence';
+    const aspect = body?.aspect || '16:9';
+    const videoName = body?.videoName || 'scene';
+    const lightingHint = body?.lightingHint || 'Cinematic volumetric studio lighting';
 
-    const promptText = `You are an elite AI prompt reverse-engineer for video generators like Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, Sora, and Midjourney v6.1.
-Look at this video scene keyframe carefully. Describe what is in this scene with extreme precision and reverse-engineer the exact master AI video prompt to recreate it identically.
-Be specific about:
-1. Subject & Action: exact person/animal/object, clothing, posture, movement
-2. Environment & Background: location, weather, depth of field
-3. Lighting & Atmosphere: natural/neon/volumetric lighting, shadows, color tone
-4. Camera & Lens: shot type, lens angle, camera motion (tracking, dolly, pan)
-
-Return ONLY a valid JSON object matching this schema (no markdown, no backticks, no other text):
+    const systemPrompt = `You are an elite Hollywood & AI prompt engineer specializing in cinematic master prompts for Sora, Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, and Midjourney v6.1.
+Reverse-engineer the given video scene into an ultra-realistic, director-level master prompt.
+Return ONLY a valid JSON object (no markdown, no backticks, no other text) with this exact schema:
 {
-  "subject": "Detailed description of subject, attire, action and setting in this scene",
-  "camera": "Shot type (e.g. low-angle tracking shot, 35mm lens dolly in) and camera motion",
-  "lighting": "Volumetric lighting, atmosphere, shadows, color grade",
-  "masterPrompt": "The complete, rich master prompt ready for Kling 1.5 or Runway Gen-3 with 4K 60fps --ar ${body?.aspect || '16:9'} --v 6.1 --style raw",
-  "negative": "blurry, low quality, deformed, extra limbs, bad face, artifacts, cartoon look"
+  "subject": "Detailed description of the subject, character, attire, pose, action, and setting",
+  "camera": "Shot type (e.g. low-angle tracking dolly, 35mm anamorphic push-in) and camera movement physics",
+  "lighting": "Volumetric lighting, atmosphere, shadows, neon/golden reflections, and color grading",
+  "masterPrompt": "The complete, rich master prompt ready for Kling 1.5 or Runway Gen-3 with 4K 60fps --ar ${aspect} --v 6.1 --style raw",
+  "negative": "blurry, low quality, deformed, extra limbs, bad face, artifacts, cartoon look, low resolution, noise"
 }`;
 
-    const parts = [{ text: promptText }];
-    if (cleanBase64) {
-      parts.push({
-        inline_data: {
-          mime_type: 'image/jpeg',
-          data: cleanBase64
+    const userPrompt = `Reverse-engineer a master prompt for this scene:
+- Topic / Focus: ${topic}
+- Video Name: ${videoName}
+- Aspect Ratio: ${aspect}
+- Lighting Profile: ${lightingHint}
+
+Make the master prompt rich, hyper-realistic, photorealistic, cinematic with exact lens and motion physics.`;
+
+    const candidateModels = [
+      'nvidia/nemotron-3.5-super-vl:free',
+      'liquid/lfm-2.5-2.6b:free',
+      'google/gemma-4-26b-a4b-it:free'
+    ];
+
+    let lastError = null;
+    let parsedResult = null;
+
+    for (const model of candidateModels) {
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'HTTP-Referer': 'https://skillora.ai',
+            'X-Title': 'Skillora AI Video Prompt Extractor'
+          },
+          body: JSON.stringify({
+            model,
+            temperature: 0.6,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ]
+          })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.choices?.[0]?.message?.content) {
+          let rawText = data.choices[0].message.content;
+          rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) rawText = jsonMatch[0];
+          parsedResult = JSON.parse(rawText);
+          parsedResult.modelUsed = model;
+          break;
+        } else {
+          lastError = data.error?.message || `Model ${model} returned error`;
         }
-      });
-    }
-
-    // Call Google Gemini API
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(userApiKey)}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 1000
-          }
-        })
+      } catch (err) {
+        lastError = err.message;
       }
-    );
-
-    const data = await response.json();
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data.error?.message || 'Gemini Vision API error' });
     }
 
-    let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) rawText = jsonMatch[0];
-    const parsed = JSON.parse(rawText);
+    if (parsedResult) {
+      return res.status(200).json(parsedResult);
+    }
 
-    return res.status(200).json(parsed);
+    return res.status(500).json({ error: lastError || 'OpenRouter extraction failed' });
   } catch (err) {
     console.error('API Extract Error:', err);
     return res.status(500).json({ error: err.message || 'Server extraction failed' });
