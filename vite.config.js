@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => {
                     env.OPENROUTER_API_KEY || 
                     env.VITE_OPENROUTER_API_KEY || 
                     process.env.OPENROUTER_API_KEY || 
-                    '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'
+                    ''
                   ).trim();
 
                   if (!apiKey) {

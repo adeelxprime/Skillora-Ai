@@ -447,14 +447,14 @@ export function PromptStudio() {
   const handleVerifyAndSaveKey = async () => {
     const raw = tempKeyInput.trim();
     if (!raw) {
-      setKeyValidationState({ type: 'error', message: 'Please paste your OpenRouter API key (sk-or-v1-...) first.' });
+      setKeyValidationState({ type: 'error', message: 'Please paste your OpenRouter API key first.' });
       return;
     }
 
     if (!raw.startsWith('sk-or-')) {
       setKeyValidationState({
         type: 'error',
-        message: 'OpenRouter API keys start with "sk-or-v1-...". Please check your key from openrouter.ai/keys'
+        message: 'OpenRouter API keys start with "sk-or-". Please check your key from openrouter.ai/keys'
       });
       return;
     }
@@ -1346,7 +1346,7 @@ export function PromptStudio() {
               <div className="flex items-start gap-2">
                 <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center shrink-0 text-[11px]">2</span>
                 <p className="text-slate-300">
-                  Default server key is already connected. You can optionally paste a custom <code className="text-cyan-300 font-mono font-bold">sk-or-v1-...</code> key below.
+                  Default server key is already connected. You can optionally paste a custom <code className="text-cyan-300 font-mono font-bold">sk-or-...</code> key below.
                 </p>
               </div>
             </div>
@@ -1360,7 +1360,7 @@ export function PromptStudio() {
                 type="password"
                 value={tempKeyInput}
                 onChange={(e) => setTempKeyInput(e.target.value)}
-                placeholder="sk-or-v1-..."
+                placeholder="sk-or-..."
                 autoComplete="off"
                 spellCheck="false"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[#020714] border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-cyan-400 transition"
