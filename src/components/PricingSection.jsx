@@ -15,7 +15,8 @@ import { PRICING_PLANS } from '../data/prompts';
 export function PricingSection({ onSelectPlan, plans = PRICING_PLANS }) {
   const [selectedPlanId, setSelectedPlanId] = useState('pro');
 
-  const displayPlans = plans && plans.length > 0 ? plans : PRICING_PLANS;
+  const displayPlans = (plans && plans.length > 0 ? plans : PRICING_PLANS)
+    .filter(p => p.id !== 'custom' && !p.name?.toLowerCase().includes('bespoke') && p.price !== 'Custom Quote');
 
   return (
     <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">

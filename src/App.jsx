@@ -88,7 +88,8 @@ export default function App() {
       });
       fetchPricingFromSupabase().then((data) => {
         if (data && data.length > 0) {
-          setPricingPlans(data);
+          const filtered = data.filter(p => p.id !== 'custom' && !p.name?.toLowerCase().includes('bespoke') && p.price !== 'Custom Quote');
+          setPricingPlans(filtered);
         }
       });
       fetchSiteConfigFromSupabase().then((data) => {

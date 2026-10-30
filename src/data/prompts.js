@@ -1036,7 +1036,14 @@ export function saveStoredPrompts(prompts) {
 export function loadStoredPricing() {
   try {
     const raw = localStorage.getItem('skillora_pricing_db');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const cleaned = parsed.filter(p => p.id !== 'custom' && !p.name?.toLowerCase().includes('bespoke') && p.price !== 'Custom Quote');
+      if (cleaned.length !== parsed.length) {
+        saveStoredPricing(cleaned);
+      }
+      return cleaned;
+    }
   } catch (e) {
     console.error('Failed to load pricing from storage', e);
   }
@@ -1045,7 +1052,8 @@ export function loadStoredPricing() {
 
 export function saveStoredPricing(pricing) {
   try {
-    localStorage.setItem('skillora_pricing_db', JSON.stringify(pricing));
+    const cleaned = (pricing || []).filter(p => p.id !== 'custom' && !p.name?.toLowerCase().includes('bespoke') && p.price !== 'Custom Quote');
+    localStorage.setItem('skillora_pricing_db', JSON.stringify(cleaned));
   } catch (e) {
     console.error('Failed to save pricing to storage', e);
   }

@@ -761,8 +761,8 @@ export function AdminPanel({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {pricingPlans.map((plan) => (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {pricingPlans.filter(p => p.id !== 'custom').map((plan) => (
                 <div 
                   key={plan.id}
                   className="bg-[#070e1f] border border-cyan-500/20 p-6 rounded-2xl space-y-4 shadow-xl"
@@ -896,7 +896,7 @@ export function AdminPanel({
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <span className="text-slate-400">Live Pricing Plans:</span>
-                  <span className="font-bold text-white">{pricingPlans.length} Active Plans</span>
+                  <span className="font-bold text-white">{pricingPlans.filter(p => p.id !== 'custom').length} Active Plans</span>
                 </div>
               </div>
 
