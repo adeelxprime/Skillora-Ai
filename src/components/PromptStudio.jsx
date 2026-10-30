@@ -240,6 +240,7 @@ export function PromptStudio() {
         v.muted = true;
         v.playsInline = true;
         v.src = url;
+        v.load();
 
         let hasCaptured = false;
         const doCapture = () => {
@@ -528,11 +529,14 @@ export function PromptStudio() {
 
     // 1. Get real video frame image
     let frameData = capturedKeyframe;
-    if (!frameData && videoRef.current) {
+    if ((!frameData || frameData.length < 500) && videoRef.current) {
       frameData = await captureFrameFromVideo();
     }
-    if (!frameData && uploadedVideoFile) {
+    if ((!frameData || frameData.length < 500) && uploadedVideoFile) {
       frameData = await extractFrameFromBlob(uploadedVideoFile);
+    }
+    if (frameData && frameData.length > 500) {
+      setCapturedKeyframe(frameData);
     }
 
     let detectedAr = '16:9';
@@ -566,6 +570,7 @@ export function PromptStudio() {
           'x-openrouter-key': activeKey
         },
         body: JSON.stringify({
+          image: frameData || '',
           topic: topicToSend,
           aspect: detectedAr,
           videoName: uploadedVideoFile?.name || videoInfo.name || 'scene',

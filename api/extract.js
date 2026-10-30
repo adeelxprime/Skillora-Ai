@@ -34,25 +34,41 @@ export default async function handler(req, res) {
     const aspect = body?.aspect || '16:9';
     const videoName = body?.videoName || 'scene';
     const lightingHint = body?.lightingHint || 'Cinematic volumetric studio lighting';
+    const hasImage = Boolean(body?.image && body.image.length > 100);
 
-    const systemPrompt = `You are an elite Hollywood & AI prompt engineer specializing in cinematic master prompts for Sora, Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, and Midjourney v6.1.
-Reverse-engineer the given video scene into an ultra-realistic, director-level master prompt.
-Return ONLY a valid JSON object (no markdown, no backticks, no other text) with this exact schema:
+    const systemPrompt = `You are an elite Hollywood director & AI prompt engineer specializing in reverse-engineering video footage for Sora, Runway Gen-3 Alpha, Kling 1.5, Luma Dream Machine, and Midjourney v6.1.
+Your job is to look closely at the video frame image and describe EVERYTHING visible in it: the exact person, animal, vehicle, or subject, their clothing, action, the surrounding environment, lighting, and camera movement.
+Return ONLY a valid JSON object (no markdown, no backticks, no conversational text) matching this schema:
 {
-  "subject": "Detailed description of the subject, character, attire, pose, action, and setting",
-  "camera": "Shot type (e.g. low-angle tracking dolly, 35mm anamorphic push-in) and camera movement physics",
-  "lighting": "Volumetric lighting, atmosphere, shadows, neon/golden reflections, and color grading",
+  "subject": "Detailed description of the subject, clothing, action, posture, and setting visible in the frame",
+  "camera": "Shot type (e.g. low-angle tracking dolly, 35mm lens) and camera movement physics",
+  "lighting": "Volumetric lighting, atmosphere, shadows, and color grade",
   "masterPrompt": "The complete, rich master prompt ready for Kling 1.5 or Runway Gen-3 with 4K 60fps --ar ${aspect} --v 6.1 --style raw",
   "negative": "blurry, low quality, deformed, extra limbs, bad face, artifacts, cartoon look, low resolution, noise"
 }`;
 
-    const userPrompt = `Reverse-engineer a master prompt for this scene:
-- Topic / Focus: ${topic}
-- Video Name: ${videoName}
-- Aspect Ratio: ${aspect}
-- Lighting Profile: ${lightingHint}
+    const userContent = [];
+    userContent.push({
+      type: 'text',
+      text: `Examine this video scene carefully. Reverse-engineer the exact master prompt to generate this exact scene in Kling AI or Runway Gen-3.
+Aspect ratio: ${aspect}. Video context: ${videoName}.`
+    });
 
-Make the master prompt rich, hyper-realistic, photorealistic, cinematic with exact lens and motion physics.`;
+    if (hasImage) {
+      let imgUrl = body.image;
+      if (!imgUrl.startsWith('data:')) {
+        imgUrl = `data:image/jpeg;base64,${imgUrl}`;
+      }
+      userContent.push({
+        type: 'image_url',
+        image_url: { url: imgUrl }
+      });
+    } else {
+      userContent.push({
+        type: 'text',
+        text: `Scene topic: ${topic}. Lighting: ${lightingHint}.`
+      });
+    }
 
     const candidateModels = [
       'nvidia/nemotron-3.5-super-vl:free',
@@ -65,6 +81,11 @@ Make the master prompt rich, hyper-realistic, photorealistic, cinematic with exa
 
     for (const model of candidateModels) {
       try {
+        // If model is text-only (like liquid), adjust content
+        const messagesContent = (model.includes('liquid') || !hasImage)
+          ? `Reverse engineer a master video prompt for scene: ${topic}. Aspect: ${aspect}. Video: ${videoName}. Lighting: ${lightingHint}. Return ONLY JSON.`
+          : userContent;
+
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -75,10 +96,10 @@ Make the master prompt rich, hyper-realistic, photorealistic, cinematic with exa
           },
           body: JSON.stringify({
             model,
-            temperature: 0.6,
+            temperature: 0.5,
             messages: [
               { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
+              { role: 'user', content: messagesContent }
             ]
           })
         });
