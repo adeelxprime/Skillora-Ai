@@ -56,14 +56,88 @@ export default function App() {
     );
   };
 
+  // Helper to determine active tab on initial load or refresh (URL query, hash, or sessionStorage)
+  const getInitialTab = () => {
+    if (typeof window === 'undefined') return 'browse';
+    if (isTargetingAdminRoute()) return 'admin';
+
+    // 1. Check URL query param: ?tab=... (e.g. ?tab=generator, ?tab=pricing, ?tab=video-prompts)
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['browse', 'video-prompts', 'image-prompts', 'generator', 'pricing', 'admin'].includes(tabParam)) {
+        return tabParam;
+      }
+    } catch {}
+
+    // 2. Check URL hash: #... (e.g. #pricing, #generator)
+    try {
+      const hash = window.location.hash.replace('#', '').toLowerCase();
+      if (['browse', 'video-prompts', 'image-prompts', 'generator', 'pricing', 'admin'].includes(hash)) {
+        return hash;
+      }
+    } catch {}
+
+    // 3. Check sessionStorage (persists across page reload in the same browser tab)
+    try {
+      const saved = sessionStorage.getItem('skillora_active_tab');
+      if (saved && ['browse', 'video-prompts', 'image-prompts', 'generator', 'pricing', 'admin'].includes(saved)) {
+        return saved;
+      }
+    } catch {}
+
+    return 'browse';
+  };
+
   // UI Navigation & Filters
-  const [activeTab, setActiveTab] = useState(() => {
-    return isTargetingAdminRoute() ? 'admin' : 'browse';
-  });
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all'); // 'all', 'video', 'image'
+  const [typeFilter, setTypeFilter] = useState(() => {
+    const initial = getInitialTab();
+    if (initial === 'video-prompts') return 'video';
+    if (initial === 'image-prompts') return 'image';
+    return 'all';
+  });
   const [accessFilter, setAccessFilter] = useState('all'); // 'all', 'free', 'premium'
+
+  // Sync activeTab to sessionStorage and browser URL query param (?tab=...)
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('skillora_active_tab', activeTab);
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (activeTab === 'browse') {
+        url.searchParams.delete('tab');
+        if (url.hash && url.hash !== '#admin') url.hash = '';
+      } else if (activeTab === 'admin') {
+        // Keep admin route clean
+      } else {
+        url.searchParams.set('tab', activeTab);
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [activeTab]);
+
+  // Support browser Back/Forward navigation and external hash navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const tab = getInitialTab();
+      setActiveTab(tab);
+      if (tab === 'video-prompts') setTypeFilter('video');
+      else if (tab === 'image-prompts') setTypeFilter('image');
+      else if (tab === 'browse') setTypeFilter('all');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
+  }, []);
 
   // Sync to localStorage
   useEffect(() => {
